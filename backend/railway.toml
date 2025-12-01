@@ -1,0 +1,11 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Railway'de persistent volume mount için
+# Railway dashboard'dan "New Volume" oluşturup "uploads" olarak mount edin
+

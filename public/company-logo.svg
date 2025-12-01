@@ -1,0 +1,18 @@
+<svg width="220" height="60" viewBox="0 0 220 60" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1F5F8B"/>
+      <stop offset="100%" stop-color="#54A0AF"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="210" height="50" rx="12" fill="url(#brandGradient)" opacity="0.12"/>
+  <g fill="url(#brandGradient)">
+    <path d="M30 15L40 30L30 45L20 30L30 15ZM30 10L15 30L30 50L45 30L30 10Z"/>
+    <path d="M62 20H70C75 20 79 24 79 30C79 36 75 40 70 40H62V20ZM70 34C72.7 34 74 32.2 74 30C74 27.8 72.7 26 70 26H67V34H70Z"/>
+    <path d="M88 20H96C101 20 104 23.5 104 27.5C104 29.9 102.8 32 100.7 33.2L105 40H98.8L95 34H93V40H88V20ZM96 30C97.7 30 99 28.8 99 27.2C99 25.6 97.7 24.4 96 24.4H93V30H96Z"/>
+    <path d="M113 20H134V24H118V28H131V32H118V36H134V40H113V20Z"/>
+    <path d="M144 20H159C163 20 167 23.5 167 28.5C167 33.5 163 37 159 37H149V40H144V20ZM149 33H158C160.2 33 162 31.5 162 28.5C162 25.5 160.2 24 158 24H149V33Z"/>
+    <path d="M176 20H196V24H181V28H194V32H181V36H196V40H176V20Z"/>
+  </g>
+</svg>
+
