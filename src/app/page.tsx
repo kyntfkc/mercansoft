@@ -121,14 +121,18 @@ function HomeContent() {
       if (savedSettings) {
         try {
           const settings = JSON.parse(savedSettings);
-          if (settings.logo) {
-            setCompanyLogo(settings.logo);
-            return;
+          if (settings.logo && settings.logo.trim() !== '') {
+            // Base64 logo veya URL kontrolü
+            if (settings.logo.startsWith('data:') || settings.logo.startsWith('http') || settings.logo.startsWith('/')) {
+              setCompanyLogo(settings.logo);
+              return;
+            }
           }
         } catch (error) {
           console.error('Company settings yüklenirken hata:', error);
         }
       }
+      // Varsayılan logo'yu göster
       setCompanyLogo('/company-logo.svg');
     }
   }, []);
@@ -234,34 +238,56 @@ function HomeContent() {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-              {companyLogo ? (
-                <Box
-                  component="img"
-                  src={companyLogo}
-                  alt="Firma Logosu"
-                  sx={{
-                    maxHeight: 56,
-                    maxWidth: '100%',
-                    objectFit: 'contain',
-                    borderRadius: 3,
-                    padding: 0.5,
-                    filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.25))',
-                    backgroundColor: 'rgba(255,255,255,0.08)'
-                  }}
-                />
-              ) : (
-                <>
-                  <DiamondIcon sx={{ 
-                    fontSize: 24, 
-                    color: 'white', 
-                    mr: 1,
-                    filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.5))'
-                  }} />
-                  <Typography variant="h5" component="h1" fontWeight="bold">
-                    MercanSoft
-                  </Typography>
-                </>
-              )}
+              <Box
+                component="img"
+                src={companyLogo || '/company-logo.svg'}
+                alt="Firma Logosu"
+                onError={(e) => {
+                  // Logo yüklenemezse varsayılan logo'yu göster
+                  const target = e.target as HTMLImageElement;
+                  const currentSrc = target.src;
+                  const defaultLogo = window.location.origin + '/company-logo.svg';
+                  
+                  if (currentSrc !== defaultLogo && currentSrc !== window.location.origin + '/company-logo.svg') {
+                    // Özel logo yüklenemezse varsayılan logo'yu dene
+                    target.src = '/company-logo.svg';
+                  } else {
+                    // Varsayılan logo da yüklenemezse icon göster
+                    target.style.display = 'none';
+                    const fallback = document.querySelector('.logo-fallback') as HTMLElement;
+                    if (fallback) {
+                      fallback.style.display = 'flex';
+                    }
+                  }
+                }}
+                sx={{
+                  maxHeight: 56,
+                  maxWidth: '100%',
+                  objectFit: 'contain',
+                  borderRadius: 3,
+                  padding: 0.5,
+                  filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.25))',
+                  backgroundColor: 'rgba(255,255,255,0.08)'
+                }}
+              />
+              {/* Logo yüklenemezse fallback göster */}
+              <Box
+                className="logo-fallback"
+                sx={{
+                  display: 'none',
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                <DiamondIcon sx={{ 
+                  fontSize: 24, 
+                  color: 'white', 
+                  filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.5))'
+                }} />
+                <Typography variant="h5" component="h1" fontWeight="bold">
+                  MercanSoft
+                </Typography>
+              </Box>
             </Box>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
               Gelişmiş Taş Hesaplama Sistemi

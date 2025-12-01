@@ -70,6 +70,18 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
     console.log(`📡 API Yanıtı: ${response.status} ${response.statusText} - ${url}`);
 
     if (!response.ok) {
+      // 401 Unauthorized hatası - Token geçersiz veya süresi dolmuş
+      if (response.status === 401 && !skipAuth) {
+        console.warn('⚠️ 401 Unauthorized - Token geçersiz, logout yapılıyor...');
+        // Auth store'dan logout yap
+        if (typeof window !== 'undefined') {
+          const { useAuthStore } = await import('../store/useAuthStore');
+          useAuthStore.getState().logout();
+          // Login sayfasına yönlendir
+          window.location.href = '/login';
+        }
+      }
+      
       let errorMessage = `HTTP error! status: ${response.status}`;
       try {
         const errorData = await response.json();
