@@ -119,6 +119,31 @@ async function initDatabase() {
       )
     `);
 
+    // Company settings table (tek satır olacak)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS company_settings (
+        id UUID PRIMARY KEY DEFAULT '00000000-0000-0000-0000-000000000000'::uuid,
+        company_name VARCHAR(255) DEFAULT 'MercanSoft',
+        legal_name VARCHAR(255),
+        tax_office VARCHAR(100),
+        tax_number VARCHAR(50),
+        address TEXT,
+        phone VARCHAR(50),
+        email VARCHAR(100),
+        website VARCHAR(255),
+        logo TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tek satır garantisi için
+    await pool.query(`
+      INSERT INTO company_settings (id, company_name)
+      VALUES ('00000000-0000-0000-0000-000000000000'::uuid, 'MercanSoft')
+      ON CONFLICT (id) DO NOTHING
+    `);
+
     await ensureDefaultUser();
 
     console.log('Veritabanı tabloları hazır');
@@ -752,6 +777,124 @@ app.delete('/api/users/:id', authenticate, async (req, res) => {
     
     res.json({ message: 'Kullanıcı silindi', id });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API Routes - Company Settings
+app.get('/api/company-settings', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM company_settings WHERE id = $1',
+      ['00000000-0000-0000-0000-000000000000']
+    );
+    
+    if (result.rows.length === 0) {
+      // İlk kez çağrılıyorsa varsayılan değerler döndür
+      return res.json({
+        id: '00000000-0000-0000-0000-000000000000',
+        companyName: 'MercanSoft',
+        legalName: '',
+        taxOffice: '',
+        taxNumber: '',
+        address: '',
+        phone: '',
+        email: '',
+        website: '',
+        logo: null,
+      });
+    }
+    
+    const settings = result.rows[0];
+    res.json({
+      id: settings.id,
+      companyName: settings.company_name,
+      legalName: settings.legal_name,
+      taxOffice: settings.tax_office,
+      taxNumber: settings.tax_number,
+      address: settings.address,
+      phone: settings.phone,
+      email: settings.email,
+      website: settings.website,
+      logo: settings.logo,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/company-settings', authenticate, async (req, res) => {
+  try {
+    const {
+      companyName,
+      legalName,
+      taxOffice,
+      taxNumber,
+      address,
+      phone,
+      email,
+      website,
+      logo,
+    } = req.body;
+
+    // Logo base64 ise, storage'a kaydet
+    let logoUrl = logo;
+    if (logo && imageStorage.isBase64(logo)) {
+      try {
+        logoUrl = await imageStorage.saveBase64Image(logo, 'company-logo');
+      } catch (error) {
+        console.error('Logo kaydetme hatası:', error);
+        // Logo kaydedilemezse base64 olarak sakla
+        logoUrl = logo;
+      }
+    }
+
+    const result = await pool.query(
+      `UPDATE company_settings SET
+        company_name = $1,
+        legal_name = $2,
+        tax_office = $3,
+        tax_number = $4,
+        address = $5,
+        phone = $6,
+        email = $7,
+        website = $8,
+        logo = $9,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = '00000000-0000-0000-0000-000000000000'
+      RETURNING *`,
+      [
+        companyName || 'MercanSoft',
+        legalName || null,
+        taxOffice || null,
+        taxNumber || null,
+        address || null,
+        phone || null,
+        email || null,
+        website || null,
+        logoUrl || null,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Company settings bulunamadı' });
+    }
+
+    const settings = result.rows[0];
+    res.json({
+      id: settings.id,
+      companyName: settings.company_name,
+      legalName: settings.legal_name,
+      taxOffice: settings.tax_office,
+      taxNumber: settings.tax_number,
+      address: settings.address,
+      phone: settings.phone,
+      email: settings.email,
+      website: settings.website,
+      logo: settings.logo,
+    });
+  } catch (error) {
+    console.error('Company settings güncelleme hatası:', error);
     res.status(500).json({ error: error.message });
   }
 });

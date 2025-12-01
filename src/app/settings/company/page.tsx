@@ -22,6 +22,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { companySettingsAPI } from '@/lib/api';
 
 export default function CompanySettings() {
   const router = useRouter();
@@ -40,24 +41,38 @@ export default function CompanySettings() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Sayfa yüklendiğinde localStorage'dan ayarları al
+  // Sayfa yüklendiğinde backend'den ayarları al
   useEffect(() => {
-    // Tarayıcı ortamında olduğunu kontrol et
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('companySettings');
-      if (savedSettings) {
-        try {
-          setSettings(JSON.parse(savedSettings));
-        } catch (error) {
-          console.error('Ayarlar yüklenirken hata:', error);
+    const loadSettings = async () => {
+      try {
+        const backendSettings = await companySettingsAPI.get();
+        setSettings({
+          companyName: backendSettings.companyName || 'MercanSoft',
+          legalName: backendSettings.legalName || '',
+          taxOffice: backendSettings.taxOffice || '',
+          taxNumber: backendSettings.taxNumber || '',
+          address: backendSettings.address || '',
+          phone: backendSettings.phone || '',
+          email: backendSettings.email || '',
+          website: backendSettings.website || '',
+          logo: backendSettings.logo || '/company-logo.svg',
+        });
+      } catch (error) {
+        console.error('Backend\'den ayarlar yüklenirken hata:', error);
+        // Fallback: localStorage'dan yükle
+        if (typeof window !== 'undefined') {
+          const savedSettings = localStorage.getItem('companySettings');
+          if (savedSettings) {
+            try {
+              setSettings(JSON.parse(savedSettings));
+            } catch (e) {
+              console.error('LocalStorage\'dan ayarlar yüklenirken hata:', e);
+            }
+          }
         }
-      } else {
-        setSettings(prev => ({
-          ...prev,
-          logo: '/company-logo.svg'
-        }));
       }
-    }
+    };
+    loadSettings();
   }, []);
 
   const handleChange = (field: string) => (event: any) => {
@@ -136,29 +151,30 @@ export default function CompanySettings() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      localStorage.setItem('companySettings', JSON.stringify(settings));
-      alert('Firma ayarları kaydedildi!');
-    } catch (error) {
-      console.error('Kaydetme hatası:', error);
+      // Backend'e kaydet
+      await companySettingsAPI.update({
+        companyName: settings.companyName,
+        legalName: settings.legalName,
+        taxOffice: settings.taxOffice,
+        taxNumber: settings.taxNumber,
+        address: settings.address,
+        phone: settings.phone,
+        email: settings.email,
+        website: settings.website,
+        logo: settings.logo,
+      });
       
-      // Logo boyutundan kaynaklanan bir hata olabileceğini varsayalım
-      const logoSizeProblem = settings.logo && settings.logo.length > 100000;
-      
-      if (logoSizeProblem) {
-        alert('Logo çok büyük olduğu için kaydedilemedi. Lütfen daha küçük bir logo kullanın veya mevcut logoyu silin.');
-        
-        // Kullanıcıya logoyu kaldırma seçeneği sun
-        if (window.confirm('Logoyu kaldırıp ayarları kaydetmek ister misiniz?')) {
-          const settingsWithoutLogo = {...settings, logo: null};
-          localStorage.setItem('companySettings', JSON.stringify(settingsWithoutLogo));
-          setSettings(settingsWithoutLogo);
-          alert('Logo kaldırıldı ve diğer ayarlar kaydedildi.');
-        }
-      } else {
-        alert('Ayarlar kaydedilirken bir hata oluştu. Tarayıcı kotası aşılmış olabilir.');
+      // LocalStorage'a da kaydet (fallback için)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('companySettings', JSON.stringify(settings));
       }
+      
+      alert('Firma ayarları kaydedildi!');
+    } catch (error: any) {
+      console.error('Kaydetme hatası:', error);
+      alert(error.message || 'Ayarlar kaydedilirken bir hata oluştu.');
     }
   };
 

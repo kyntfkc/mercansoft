@@ -44,6 +44,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
+import { companySettingsAPI } from '../lib/api';
 
 // Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
 const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
@@ -114,28 +115,40 @@ function HomeContent() {
     }
   }, [isMounted, isAuthenticated, router]);
 
-  // Company settings'ten logoyu yükle
+  // Company settings'ten logoyu backend'den yükle
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('companySettings');
-      if (savedSettings) {
+    const loadLogo = async () => {
+      if (isMounted && isAuthenticated) {
         try {
-          const settings = JSON.parse(savedSettings);
+          const settings = await companySettingsAPI.get();
           if (settings.logo && settings.logo.trim() !== '') {
-            // Base64 logo veya URL kontrolü
-            if (settings.logo.startsWith('data:') || settings.logo.startsWith('http') || settings.logo.startsWith('/')) {
-              setCompanyLogo(settings.logo);
-              return;
-            }
+            setCompanyLogo(settings.logo);
+            return;
           }
         } catch (error) {
-          console.error('Company settings yüklenirken hata:', error);
+          console.error('Backend\'den logo yüklenirken hata:', error);
+          // Fallback: localStorage'dan yükle
+          if (typeof window !== 'undefined') {
+            const savedSettings = localStorage.getItem('companySettings');
+            if (savedSettings) {
+              try {
+                const localSettings = JSON.parse(savedSettings);
+                if (localSettings.logo && localSettings.logo.trim() !== '') {
+                  setCompanyLogo(localSettings.logo);
+                  return;
+                }
+              } catch (e) {
+                console.error('LocalStorage\'dan logo yüklenirken hata:', e);
+              }
+            }
+          }
         }
       }
       // Varsayılan logo'yu göster
       setCompanyLogo('/company-logo.svg');
-    }
-  }, []);
+    };
+    loadLogo();
+  }, [isMounted, isAuthenticated]);
 
   // Uygulama açıldığında backend'den veri çek (sadece bir kez, client-side'da)
   useEffect(() => {

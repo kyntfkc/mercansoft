@@ -270,6 +270,33 @@ export const authAPI = {
   },
 };
 
+export interface CompanySettings {
+  id: string;
+  companyName: string;
+  legalName?: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logo?: string | null;
+}
+
+// Company Settings API
+export const companySettingsAPI = {
+  get: async (): Promise<CompanySettings> => {
+    return fetchAPI<CompanySettings>('/api/company-settings');
+  },
+
+  update: async (settings: Partial<CompanySettings>): Promise<CompanySettings> => {
+    return fetchAPI<CompanySettings>('/api/company-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  },
+};
+
 export interface User {
   id: string;
   username: string;
