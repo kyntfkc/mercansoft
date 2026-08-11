@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { AppState, Model, Stone, StoneSet, CalculationResult, CalculationHistoryItem } from '../types';
 import { stonesAPI, modelsAPI, stoneSetsAPI } from '../lib/api';
+import { inferMetalTypeFromName, resolveMetalType } from '../lib/metalType';
 
 const generateId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -63,9 +64,26 @@ const syncFromBackend = async (set: any) => {
 
     console.log(`📊 Toplam ${allStones.length} taş store'a eklendi`);
 
+    const modelsWithMetalType = (models || []).map((model) => {
+      if (model.metalType) {
+        return model;
+      }
+      const inferredMetalType = inferMetalTypeFromName(model.name);
+      return inferredMetalType ? { ...model, metalType: inferredMetalType } : model;
+    });
+
+    modelsWithMetalType.forEach((model) => {
+      const original = (models || []).find((item) => item.id === model.id);
+      if (original && !original.metalType && model.metalType) {
+        modelsAPI.update(model.id, { metalType: model.metalType }).catch((error) => {
+          console.error(`Model metal türü kaydedilemedi (${model.name}):`, error);
+        });
+      }
+    });
+
     set({
       stones: allStones,
-      models: models || [],
+      models: modelsWithMetalType,
       stoneSets: stoneSets || [],
     });
   } catch (error: any) {
@@ -163,30 +181,38 @@ export const useStore = create<
 
       // Model işlemleri
       addModel: async (model) => {
+        const payload = {
+          ...model,
+          metalType: resolveMetalType(model.name, model.metalType),
+        };
         try {
-          const newModel = await modelsAPI.create(model);
+          const newModel = await modelsAPI.create(payload);
           set((state) => ({
             models: [...state.models, newModel],
           }));
         } catch (error) {
           console.error('Model ekleme hatası:', error);
-          // Fallback: Local storage'a ekle
           set((state) => ({
-            models: [...state.models, { ...model, id: generateId() }],
+            models: [...state.models, { ...payload, id: generateId() }],
           }));
         }
       },
       updateModel: async (id, model) => {
+        const existing = get().models.find((item) => item.id === id);
+        const nextName = model.name ?? existing?.name ?? '';
+        const payload = {
+          ...model,
+          metalType: resolveMetalType(nextName, model.metalType ?? existing?.metalType),
+        };
         try {
-          const updatedModel = await modelsAPI.update(id, model);
+          const updatedModel = await modelsAPI.update(id, payload);
           set((state) => ({
             models: state.models.map((m) => (m.id === id ? updatedModel : m)),
           }));
         } catch (error) {
           console.error('Model güncelleme hatası:', error);
-          // Fallback: Local storage'da güncelle
           set((state) => ({
-            models: state.models.map((m) => (m.id === id ? { ...m, ...model } : m)),
+            models: state.models.map((m) => (m.id === id ? { ...m, ...payload } : m)),
           }));
         }
       },
@@ -351,6 +377,12 @@ export const useStore = create<
           productionCount: result.productionCount,
           totalWeight: result.totalWeight,
           timestamp: new Date().toISOString(),
+          stoneDetails: result.stoneDetails.map((detail) => ({
+            stoneId: detail.stoneId,
+            stoneName: detail.stoneName,
+            quantity: detail.quantity,
+            totalWeight: detail.totalWeight,
+          })),
         };
         set((state) => ({
           calculationHistory: [...state.calculationHistory, historyItem],
@@ -390,6 +422,15 @@ export const useStore = create<
               }
             }
             return stone;
+          });
+        }
+        if (persistedState?.models && Array.isArray(persistedState.models)) {
+          persistedState.models = persistedState.models.map((model: Model) => {
+            if (model.metalType) {
+              return model;
+            }
+            const inferredMetalType = inferMetalTypeFromName(model.name);
+            return inferredMetalType ? { ...model, metalType: inferredMetalType } : model;
           });
         }
         return { ...currentState, ...persistedState };

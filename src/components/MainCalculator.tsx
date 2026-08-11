@@ -26,30 +26,15 @@ import {
   IconButton
 } from '@mui/material';
 import { useStore } from '../store/useStore';
+import { matchesAnySearch } from '../lib/search';
+import { matchesMetalTypeFilter, MetalTypeFilter } from '../lib/metalType';
+import MetalTypeToggle from './MetalTypeToggle';
+import { companySettingsAPI, receiptSettingsAPI } from '../lib/api';
+import { buildReceiptHtml, openPrintWindow } from '../lib/receipt';
 import PrintIcon from '@mui/icons-material/Print';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { toast } from 'react-hot-toast';
-
-// Electron API'si için Window tipini genişlet
-declare global {
-  interface Window {
-    electron?: {
-      getAppVersion: () => Promise<string>;
-      print: (content: string, settings?: any) => Promise<{success: boolean; message: string}>;
-      checkForUpdates: () => Promise<any>;
-      exportData: (data: any) => Promise<any>;
-      importData: () => Promise<any>;
-    };
-    electronAPI?: {
-      ping: () => Promise<string>;
-      getAppVersion: () => Promise<string>;
-      saveFile: (data: any, filename: string) => Promise<any>;
-      openFile: () => Promise<any>;
-      print: (content: string) => Promise<any>;
-    };
-  }
-}
 
 // Model tipi tanımı
 interface Model {
@@ -57,6 +42,7 @@ interface Model {
   name: string;
   stockCode?: string;
   category?: string;
+  metalType?: 'altın' | 'gümüş';
   image?: string;
   stones: Array<{stoneId: string; quantity: number}>;
 }
@@ -84,6 +70,9 @@ export default function MainCalculator() {
   
   // Seçilen model için yerel durum
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [metalFilter, setMetalFilter] = useState<MetalTypeFilter>('all');
+
+  const filteredModels = models.filter((model) => matchesMetalTypeFilter(model.metalType, metalFilter));
 
   // Varsayılan olarak boş değerler (sadece mount'ta)
   useEffect(() => {
@@ -92,6 +81,14 @@ export default function MainCalculator() {
     setProductionCount(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (selectedModel && !matchesMetalTypeFilter(selectedModel.metalType, metalFilter)) {
+      setSelectedModel(null);
+      setSelectedModelId(null);
+      setShowResults(false);
+    }
+  }, [metalFilter, selectedModel, setSelectedModelId]);
 
   // Seçili modelin resim URL'sini al
   const selectedModelImage = models.find(m => m.id === selectedModelId)?.image;
@@ -135,318 +132,62 @@ export default function MainCalculator() {
     toast.success("Kayıt silindi!");
   };
 
-  // Geçmişi yazdırma (baskı önizleme - sadece son hesaplama)
-  const handlePrintHistory = () => {
+  // Geçmiş listesinin tamamını yazdır
+  const handlePrintHistory = async () => {
     if (calculationHistory.length === 0) {
       toast.error("Yazdırılacak hesaplama bulunmuyor!");
       return;
     }
 
-    // Son hesaplamayı al
-    const lastItem = calculationHistory[calculationHistory.length - 1];
-
-    // LocalStorage'den kaydedilmiş fiş ayarlarını al
-    let settings = {
-      title: "TAŞTAŞ TAŞ HESABI",
-      titleBold: true,
-      titleSize: 16,
-      width: 80,
-      minHeight: 150,
-      fontSize: 12,
-      footerFontSize: 10,
-      fontFamily: "Arial, sans-serif",
-      showTitle: true,
-      showModel: true,
-      showFooter: true,
-      footerText: "Teşekkür Ederiz",
-      modelName: "Test Modeli"
-    };
-
     try {
-      const savedSettings = localStorage.getItem("receiptSettings");
-      if (savedSettings) {
-        settings = { ...settings, ...JSON.parse(savedSettings) };
-      }
-    } catch (error) {
-      console.error("Fiş ayarları yüklenirken hata:", error);
-    }
+      const [settings, company] = await Promise.all([
+        receiptSettingsAPI.get(),
+        companySettingsAPI.get().catch(() => null),
+      ]);
 
-    // Baskı önizleme için HTML içeriği oluştur (sadece son hesaplama, fiş tasarım ayarlarını kullan)
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Taş Hesabı</title>
-          <style>
-            @page {
-              size: ${settings.width}mm ${settings.minHeight}mm;
-              margin: 0;
-            }
-            
-            body {
-              margin: 0;
-              padding: 0;
-              width: ${settings.width}mm;
-              height: ${settings.minHeight}mm;
-              font-family: ${settings.fontFamily};
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact;
-              color-adjust: exact;
-            }
-            
-            .receipt {
-              padding: 5mm;
-              height: ${settings.minHeight - 10}mm;
-              width: ${settings.width - 10}mm;
-              display: flex;
-              flex-direction: column;
-              box-sizing: border-box;
-              text-align: center;
-            }
-            
-            .header {
-              margin-bottom: 5mm;
-              border-bottom: 1px dashed #ccc;
-              padding-bottom: 2mm;
-              font-size: ${settings.titleSize}px;
-              font-weight: ${settings.titleBold ? 'bold' : 'normal'};
-            }
-            
-            .model {
-              font-size: ${settings.fontSize + 2}px;
-              padding: 3mm 0;
-              background-color: #f8f8f8;
-              margin: 3mm 0;
-            }
-            
-            .details {
-              display: flex;
-              justify-content: space-between;
-              padding: 3mm 0;
-            }
-            
-            .detail-item {
-              flex: 1;
-            }
-            
-            .detail-value {
-              font-size: ${settings.fontSize + 4}px;
-              font-weight: bold;
-            }
-            
-            .detail-label {
-              font-size: ${settings.fontSize - 2}px;
-              color: #666;
-            }
-            
-            .footer {
-              margin-top: auto;
-              font-size: ${settings.footerFontSize}px;
-              padding-top: 3mm;
-              border-top: 1px dashed #ccc;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            ${settings.showTitle ? `<div class="header">${settings.title}</div>` : ''}
-            
-            ${settings.showModel ? 
-              `<div class="model">${settings.modelName?.trim() ? settings.modelName : lastItem.modelName}</div>` : ''}
-            
-            <div class="details">
-              ${settings.showQuantity ? `
-                <div class="detail-item">
-                  <div class="detail-value">${lastItem.productionCount}</div>
-                  <div class="detail-label">ADET</div>
-                </div>
-              ` : ''}
-              
-              <div class="detail-item">
-                <div class="detail-value">${lastItem.totalWeight.toFixed(2)}</div>
-                <div class="detail-label">TAŞ GRAMI</div>
-              </div>
-            </div>
-            
-            ${settings.showFooter ? `<div class="footer">${settings.footerText}</div>` : ''}
-          </div>
-        </body>
-      </html>
-    `;
+      const resolveStoneDetails = (item: (typeof calculationHistory)[number]) => {
+        if (item.stoneDetails && item.stoneDetails.length > 0) {
+          return item.stoneDetails.map((detail) => ({
+            stoneName: detail.stoneName,
+            quantity: detail.quantity,
+            totalWeight: detail.totalWeight,
+          }));
+        }
 
-    // Yeni pencere aç ve içeriği yazdır (baskı önizleme)
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      // Baskı önizleme açılsın, hemen yazıcı tetiklenmesin
-      // Kullanıcı manuel olarak yazdırabilir
-    }
-  };
+        const model = models.find((m) => m.name === item.modelName);
+        if (!model) return [];
 
-  // Yazdırma işlemi (eski - şimdilik kullanılmayacak)
-  const handlePrint = async () => {
-    try {
-      if (!calculationResult) {
-        toast.error("Lütfen önce hesaplama yapınız!");
-        return;
-      }
-
-      // LocalStorage'den kaydedilmiş fiş ayarlarını al
-      let settings = {
-        title: "TAŞTAŞ TAŞ HESABI",
-        titleBold: true,
-        titleSize: 16,
-        width: 80,
-        minHeight: 150,
-        fontSize: 12,
-        footerFontSize: 10,
-        fontFamily: "Arial, sans-serif",
-        showTitle: true,
-        showModel: true,
-        showFooter: true,
-        footerText: "Teşekkür Ederiz",
-        modelName: "Test Modeli"
+        return model.stones.map((modelStone) => {
+          const stone = stones.find((s) => s.id === modelStone.stoneId);
+          const quantity = modelStone.quantity * item.productionCount;
+          const countPerGram = stone?.countPerGram || 0;
+          const singleWeight = countPerGram > 0 ? 1 / countPerGram : 0;
+          return {
+            stoneName: stone?.name || 'Bilinmeyen Taş',
+            quantity,
+            totalWeight: singleWeight * quantity,
+          };
+        });
       };
 
-      try {
-        const savedSettings = localStorage.getItem("receiptSettings");
-        if (savedSettings) {
-          settings = { ...settings, ...JSON.parse(savedSettings) };
-        }
-      } catch (error) {
-        console.error("Fiş ayarları yüklenirken hata:", error);
-      }
+      const html = buildReceiptHtml(
+        settings,
+        {
+          items: calculationHistory.map((item) => ({
+            modelName: item.modelName,
+            productionCount: item.productionCount,
+            totalWeight: item.totalWeight,
+            stoneDetails: resolveStoneDetails(item),
+          })),
+          printedAt: new Date(),
+        },
+        company?.logo
+      );
 
-      // Fiş içeriği - basitleştirilmiş, tek sayfa için optimize edilmiş
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Taş Hesabı</title>
-          <style>
-            @page {
-              size: ${settings.width}mm ${settings.minHeight}mm;
-              margin: 0;
-            }
-            
-            body {
-              margin: 0;
-              padding: 0;
-              width: ${settings.width}mm;
-              height: ${settings.minHeight}mm;
-              font-family: ${settings.fontFamily};
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact;
-              color-adjust: exact;
-            }
-            
-            .receipt {
-              padding: 5mm;
-              height: ${settings.minHeight - 10}mm;
-              width: ${settings.width - 10}mm;
-              display: flex;
-              flex-direction: column;
-              box-sizing: border-box;
-              text-align: center;
-            }
-            
-            .header {
-              margin-bottom: 5mm;
-              border-bottom: 1px dashed #ccc;
-              padding-bottom: 2mm;
-              font-size: ${settings.titleSize}px;
-              font-weight: ${settings.titleBold ? 'bold' : 'normal'};
-            }
-            
-            .model {
-              font-size: ${settings.fontSize + 2}px;
-              padding: 3mm 0;
-              background-color: #f8f8f8;
-              margin: 3mm 0;
-            }
-            
-            .details {
-              display: flex;
-              justify-content: space-between;
-              padding: 3mm 0;
-            }
-            
-            .detail-item {
-              flex: 1;
-            }
-            
-            .detail-value {
-              font-size: ${settings.fontSize + 4}px;
-              font-weight: bold;
-            }
-            
-            .detail-label {
-              font-size: ${settings.fontSize - 2}px;
-              color: #666;
-            }
-            
-            .footer {
-              margin-top: auto;
-              font-size: ${settings.footerFontSize}px;
-              padding-top: 3mm;
-              border-top: 1px dashed #ccc;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            ${settings.showTitle ? `<div class="header">${settings.title}</div>` : ''}
-            
-            ${settings.showModel ? 
-              `<div class="model">${settings.modelName?.trim() ? settings.modelName : calculationResult.modelName}</div>` : ''}
-            
-            <div class="details">
-              ${settings.showQuantity ? `
-              <div class="detail-item">
-                <div class="detail-value">${calculationResult.productionCount}</div>
-                <div class="detail-label">ADET</div>
-              </div>
-              ` : ''}
-              
-              <div class="detail-item">
-                <div class="detail-value">${calculationResult.totalWeight.toFixed(2)}</div>
-                <div class="detail-label">TAŞ GRAMI</div>
-              </div>
-            </div>
-            
-            ${settings.showFooter ? `<div class="footer">${settings.footerText}</div>` : ''}
-          </div>
-        </body>
-        </html>
-      `;
-
-      // Electron API'si mevcutsa, onunla yazdır
-      if (window.electron) {
-        const result = await window.electron.print(printContent, {
-          width: settings.width,
-          height: settings.minHeight
-        });
-        
-        if (result.success) {
-          toast.success("Yazdırma işlemi başarılı!");
-          
-          // Sayfayı yeniden hesaplama yapılabilir duruma getir
-          setTimeout(() => {
-            // Input alanlarını reset etme
-            setLocalProductionCount(calculationResult.productionCount.toString());
-          }, 100);
-        } else {
-          toast.error(`Yazdırma hatası: ${result.message}`);
-        }
-      } else {
-        // Web tarayıcıda yazdırma desteği
-        // ...
-      }
-    } catch (error) {
+      openPrintWindow(html);
+    } catch (error: any) {
       console.error("Yazdırma hatası:", error);
+      toast.error(error?.message || "Yazdırma sırasında bir hata oluştu");
     }
   };
 
@@ -472,17 +213,22 @@ export default function MainCalculator() {
               >
             Model Seçimi ve Üretim Adedi
           </Typography>
+
+          <Box sx={{ mb: 2 }}>
+            <MetalTypeToggle value={metalFilter} onChange={setMetalFilter} />
+          </Box>
           
           <Autocomplete
             id="model-autocomplete"
-            options={models}
+            options={filteredModels}
             getOptionLabel={(option) => option.name}
             filterOptions={(options, state) => {
-              const inputValue = state.inputValue.toLowerCase().trim();
-              return options.filter(
-                option => 
-                  option.name.toLowerCase().includes(inputValue) || 
-                  (option.stockCode && option.stockCode.toLowerCase().includes(inputValue))
+              const inputValue = state.inputValue;
+              if (!inputValue.trim()) {
+                return options;
+              }
+              return options.filter((option) =>
+                matchesAnySearch(inputValue, option.name, option.stockCode, option.category)
               );
             }}
             renderOption={(props, option) => {

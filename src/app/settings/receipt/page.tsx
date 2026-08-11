@@ -36,6 +36,15 @@ import InfoIcon from '@mui/icons-material/Info';
 import PrintIcon from '@mui/icons-material/Print';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { companySettingsAPI, receiptSettingsAPI } from '@/lib/api';
+import {
+  buildReceiptHtml,
+  defaultReceiptSettings,
+  mergeReceiptSettings,
+  openPrintWindow,
+  ReceiptSettings as ReceiptSettingsType,
+} from '@/lib/receipt';
+import { resolveLogoUrl } from '@/lib/logo';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: '100%',
@@ -113,99 +122,38 @@ const formatTime = (date: Date): string => {
 
 export default function ReceiptSettings() {
   const router = useRouter();
-  const initialSettings = {
-    // Başlık Ayarları
-    showTitle: true,
-    title: 'MercanSoft',
-    titleSize: 16,
-    titleBold: true,
-    titleCenter: true,
-    titleColor: '#000000',
+  const initialSettings = defaultReceiptSettings();
 
-    // Font Ayarları
-    fontFamily: 'Arial',
-    fontSize: 12,
-    lineHeight: 1.5,
-    textColor: '#000000',
-
-    // İçerik Ayarları
-    showLogo: true,
-    logoSize: 100,
-    showDate: true,
-    showTime: true,
-    showModel: true,
-    showQuantity: true,
-    modelName: 'Test Modeli',
-    dateFormat: 'DD.MM.YYYY',
-    timeFormat: '24',
-    
-    // Tablo Ayarları
-    tableBorder: true,
-    tableHeaderBold: true,
-    columnSpacing: 8,
-    headerBgColor: '#f5f5f5',
-    borderColor: '#e0e0e0',
-    
-    // Kenar Boşlukları
-    margins: {
-      top: 10,
-      right: 10,
-      bottom: 10,
-      left: 10
-    },
-    
-    // Fiş Boyutları
-    width: 50, // mm
-    minHeight: 100, // mm
-    
-    // Alt Bilgi
-    showFooter: true,
-    footerText: 'Bizi tercih ettiğiniz için teşekkür ederiz.',
-    footerFontSize: 10,
-  };
-
-  const [settings, setSettings] = useState(initialSettings);
+  const [settings, setSettings] = useState<ReceiptSettingsType>(initialSettings);
+  const [savedSettings, setSavedSettings] = useState<ReceiptSettingsType>(initialSettings);
   const [hasChanges, setHasChanges] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Değişiklikleri izle useEffect kısmını düzelteceğim
   useEffect(() => {
-    // Sayfa ilk yüklendiğinde localStorage'dan ayarları al
-    const savedSettings = localStorage.getItem('receiptSettings');
-    if (savedSettings) {
+    const load = async () => {
       try {
-        setSettings(JSON.parse(savedSettings));
+        const [loadedSettings, company] = await Promise.all([
+          receiptSettingsAPI.get(),
+          companySettingsAPI.get().catch(() => null),
+        ]);
+        const merged = mergeReceiptSettings(loadedSettings);
+        setSettings(merged);
+        setSavedSettings(merged);
+        setCompanyLogo(company?.logo || null);
       } catch (error) {
-        console.error('Ayarlar yüklenirken hata oluştu:', error);
+        console.error('Fiş ayarları yüklenirken hata:', error);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      // Kayıtlı ayar yoksa varsayılanları kullan
-      setSettings(initialSettings);
-    }
+    };
+    load();
   }, []);
 
-  // Değişiklikleri izle - bu kısmı düzelteceğim
   useEffect(() => {
-    // İlk render sonrası değişiklikleri aktif et
-    const savedSettings = localStorage.getItem('receiptSettings');
-    
-    // Değişiklik kontrolünü daha güvenli hale getiriyorum
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings);
-        // Derin karşılaştırma yaparak gerçekten değişiklik olup olmadığını kontrol et
-        const isChanged = JSON.stringify(settings) !== JSON.stringify(parsedSettings);
-        setHasChanges(isChanged);
-        console.log('Ayarlarda değişiklik var mı:', isChanged);
-      } catch (error) {
-        console.error('Ayarlar karşılaştırılırken hata oluştu:', error);
-        setHasChanges(true);
-      }
-    } else {
-      // Kayıtlı ayar yoksa ama varsayılandan farklı ayarlar varsa
-      const isChanged = JSON.stringify(settings) !== JSON.stringify(initialSettings);
-      setHasChanges(isChanged);
-    }
-  }, [settings]);
+    setHasChanges(JSON.stringify(settings) !== JSON.stringify(savedSettings));
+  }, [settings, savedSettings]);
 
   const handleChange = (field: string) => (event: any) => {
     if (field.startsWith('margins.')) {
@@ -233,173 +181,61 @@ export default function ReceiptSettings() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      console.log('Ayarlar kaydediliyor...');
-      
-      // Ayarları direkt olarak kaydet
-      const jsonString = JSON.stringify(settings);
-      
-      // localStorage'a kaydet
-      localStorage.setItem('receiptSettings', jsonString);
-      console.log('Ayarlar localStorage\'a kaydedildi');
-      
-      // Değişiklik durumunu güncelle
+      setSaving(true);
+      const saved = await receiptSettingsAPI.update(settings);
+      setSettings(saved);
+      setSavedSettings(saved);
       setHasChanges(false);
-      
-      // Bildirim göster
       alert('Fiş tasarım ayarları başarıyla kaydedildi!');
     } catch (error: any) {
       console.error('Ayarlar kaydedilirken hata oluştu:', error);
       alert(`Ayarlar kaydedilirken bir hata oluştu: ${error.message || 'Bilinmeyen hata'}`);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handlePrint = () => {
-    const receiptElement = document.getElementById('receipt-preview');
-    if (receiptElement) {
-      const printWindow = window.open('', '', 'width=800,height=600');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Taş Hesabı</title>
-            <meta charset="utf-8">
-            <style>
-              @page {
-                size: ${settings.width}mm ${settings.minHeight}mm;
-                margin: 0;
-              }
-              body {
-                font-family: ${settings.fontFamily};
-                width: ${settings.width}mm;
-                height: ${settings.minHeight}mm;
-                margin: 0;
-                padding: 4mm;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                box-sizing: border-box;
-                background-color: #fbfbfb;
-              }
-              .content {
-                text-align: center;
-                border: 2px solid #ccdbe3;
-                border-radius: 5px;
-                padding: 5px;
-                background-color: white;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-                position: relative;
-              }
-              .content:before {
-                content: '';
-                position: absolute;
-                top: 3px;
-                left: 3px;
-                right: 3px;
-                bottom: 3px;
-                border: 1px solid #e8f0f4;
-                border-radius: 3px;
-                pointer-events: none;
-              }
-              .logo {
-                text-align: center;
-                margin-bottom: 5px;
-                font-size: ${settings.titleSize}px;
-                color: #225C73;
-                border-bottom: 1px dashed #dde9ef;
-                padding-bottom: 5px;
-                font-weight: ${settings.titleBold ? 'bold' : 'normal'};
-              }
-              .product-name {
-                font-size: ${settings.fontSize + 1}px;
-                margin: 6px 0;
-                background-color: #f3f8fb;
-                padding: 3px;
-                border-radius: 3px;
-                border: 1px solid #e0ebf2;
-              }
-              .info-container {
-                display: flex;
-                justify-content: space-between;
-                margin: 6px 0;
-                padding: 3px;
-                border-radius: 3px;
-                background-color: #f8fbfc;
-              }
-              .info-block {
-                text-align: center;
-                flex: 1;
-                padding: 3px;
-                border-radius: 3px;
-              }
-              .info-value {
-                font-size: ${settings.fontSize + 4}px;
-                font-weight: bold;
-                margin-bottom: 2px;
-                color: #225C73;
-              }
-              .info-label {
-                font-size: ${settings.fontSize - 3}px;
-                color: #666;
-                text-transform: uppercase;
-              }
-              .footer {
-                margin-top: 6px;
-                font-size: ${settings.footerFontSize}px;
-                color: #225C73;
-                text-align: center;
-                border-top: 1px dashed #dde9ef;
-                padding-top: 4px;
-                font-weight: 500;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="content">
-              ${settings.showTitle ? `<div class="logo">${settings.title}</div>` : ''}
-              
-              ${settings.showModel ? `<div class="product-name">${settings.modelName}</div>` : ''}
-              
-              <div class="info-container">
-                <div class="info-block">
-                  <div class="info-value">2</div>
-                  <div class="info-label">ADET</div>
-                </div>
-                
-                <div class="info-block">
-                  <div class="info-value">1.5</div>
-                  <div class="info-label">TAŞ GRAMI</div>
-                </div>
-              </div>
-              
-              ${settings.showFooter ? `<div class="footer">${settings.footerText}</div>` : ''}
-            </div>
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
+    try {
+      const html = buildReceiptHtml(
+        settings,
+        {
+          modelName: settings.modelName?.trim() || 'Örnek Model',
+          productionCount: 2,
+          totalWeight: 1.5,
+          stoneDetails: [
+            { stoneName: 'Zirkon 1.5mm', quantity: 24, totalWeight: 0.96 },
+            { stoneName: 'Baget 2mm', quantity: 8, totalWeight: 0.54 },
+          ],
+          printedAt: new Date(),
+        },
+        companyLogo
+      );
+      openPrintWindow(html);
+    } catch (error: any) {
+      alert(error?.message || 'Yazdırma sırasında bir hata oluştu');
     }
   };
 
   const handleReset = () => {
     if (window.confirm('Tüm ayarları sıfırlamak istediğinize emin misiniz?')) {
-      setSettings(initialSettings);
+      setSettings(defaultReceiptSettings());
       setHasChanges(true);
     }
   };
 
   const ReceiptPreview = () => {
     const previewData = {
-      items: [
-        { quantity: 2, weight: 1.5 },
-        { quantity: 1, weight: 0.8 },
+      total: { quantity: 2, weight: 1.5 },
+      stones: [
+        { stoneName: 'Zirkon 1.5mm', quantity: 24, totalWeight: 0.96 },
+        { stoneName: 'Baget 2mm', quantity: 8, totalWeight: 0.54 },
       ],
-      total: { quantity: 3, weight: 2.3 }
     };
+    const now = new Date();
+    const logoSrc = companyLogo ? resolveLogoUrl(companyLogo) : null;
 
     return (
       <Paper 
@@ -418,7 +254,7 @@ export default function ReceiptSettings() {
       >
         <Box 
           sx={{ 
-            textAlign: 'center',
+            textAlign: settings.titleCenter ? 'center' : 'left',
             border: '2px solid #ccdbe3',
             borderRadius: '5px',
             p: 1,
@@ -427,19 +263,42 @@ export default function ReceiptSettings() {
             position: 'relative',
           }}
         >
+          {settings.showLogo && logoSrc && (
+            <Box sx={{ mb: 1, display: 'flex', justifyContent: 'center' }}>
+              <Box
+                component="img"
+                src={logoSrc}
+                alt="Logo"
+                sx={{
+                  height: Math.max(24, Math.round((settings.logoSize / 100) * 48)),
+                  maxWidth: '100%',
+                  objectFit: 'contain',
+                }}
+              />
+            </Box>
+          )}
+
           {settings.showTitle && (
             <Typography 
               sx={{
-                textAlign: 'center',
+                textAlign: settings.titleCenter ? 'center' : 'left',
                 mb: 0.5,
                 fontSize: settings.titleSize,
-                color: '#225C73',
+                color: settings.titleColor || '#225C73',
                 borderBottom: '1px dashed #dde9ef',
                 pb: 0.5,
                 fontWeight: settings.titleBold ? 'bold' : 'normal'
               }}
             >
               {settings.title}
+            </Typography>
+          )}
+
+          {(settings.showDate || settings.showTime) && (
+            <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#666', mb: 0.75 }}>
+              {settings.showDate ? formatDate(now) : ''}
+              {settings.showDate && settings.showTime ? ' ' : ''}
+              {settings.showTime ? formatTime(now) : ''}
             </Typography>
           )}
           
@@ -454,7 +313,7 @@ export default function ReceiptSettings() {
                 border: '1px solid #e0ebf2'
               }}
             >
-              {settings.modelName}
+              {settings.modelName?.trim() || 'Örnek Model'}
             </Typography>
           )}
           
@@ -529,6 +388,35 @@ export default function ReceiptSettings() {
               </Typography>
             </Box>
           </Box>
+
+          <Box sx={{ mt: 1, pt: 0.75, borderTop: '1px dotted #dde9ef', textAlign: 'left' }}>
+            <Typography
+              sx={{
+                fontSize: Math.max(8, settings.fontSize - 1),
+                fontWeight: settings.tableHeaderBold ? 'bold' : 'normal',
+                color: '#666',
+                textTransform: 'uppercase',
+                mb: 0.5,
+              }}
+            >
+              Taş Detayları
+            </Typography>
+            {previewData.stones.map((stone) => (
+              <Box key={stone.stoneName} sx={{ py: 0.4 }}>
+                <Typography sx={{ fontSize: settings.fontSize, fontWeight: 500, mb: 0.15 }}>
+                  {stone.stoneName}
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                  <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555' }}>
+                    {stone.quantity} adet
+                  </Typography>
+                  <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555' }}>
+                    {stone.totalWeight.toFixed(3)} gr
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
           
           {settings.showFooter && (
             <Typography 
@@ -549,6 +437,14 @@ export default function ReceiptSettings() {
       </Paper>
     );
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>Fiş ayarları yükleniyor...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: '1200px', mx: 'auto', p: { xs: 1, sm: 2 } }}>
@@ -584,6 +480,18 @@ export default function ReceiptSettings() {
                         <FormControlLabel
                           control={<Switch checked={settings.showTitle} onChange={handleChange('showTitle')} size="small" color="primary" />}
                           label={<Typography variant="body2">Başlık</Typography>}
+                        />
+                        <FormControlLabel
+                          control={<Switch checked={settings.showLogo} onChange={handleChange('showLogo')} size="small" color="primary" />}
+                          label={<Typography variant="body2">Logo</Typography>}
+                        />
+                        <FormControlLabel
+                          control={<Switch checked={settings.showDate} onChange={handleChange('showDate')} size="small" color="primary" />}
+                          label={<Typography variant="body2">Tarih</Typography>}
+                        />
+                        <FormControlLabel
+                          control={<Switch checked={settings.showTime} onChange={handleChange('showTime')} size="small" color="primary" />}
+                          label={<Typography variant="body2">Saat</Typography>}
                         />
                         <FormControlLabel
                           control={<Switch checked={settings.showModel} onChange={handleChange('showModel')} size="small" color="primary" />}
@@ -796,9 +704,9 @@ export default function ReceiptSettings() {
                     bgcolor: hasChanges ? 'primary.dark' : 'grey.500'
                   }
                 }}
-                disabled={!hasChanges}
+                disabled={!hasChanges || saving}
               >
-                {hasChanges ? 'Kaydet' : 'Kaydedildi'}
+                {saving ? 'Kaydediliyor...' : hasChanges ? 'Kaydet' : 'Kaydedildi'}
               </Button>
             </Box>
             

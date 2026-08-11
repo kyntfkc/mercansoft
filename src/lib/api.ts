@@ -1,6 +1,7 @@
 // API Client for Railway Backend
 
 import { useAuthStore } from '../store/useAuthStore';
+import { defaultReceiptSettings, mergeReceiptSettings, ReceiptSettings } from './receipt';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-678d.up.railway.app';
 
@@ -82,15 +83,16 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
         }
       }
       
+      const bodyText = await response.text();
       let errorMessage = `HTTP error! status: ${response.status}`;
       try {
-        const errorData = await response.json();
+        const errorData = JSON.parse(bodyText);
         errorMessage = errorData.error || errorMessage;
         console.error(`❌ API Hatası:`, errorData);
-      } catch (e) {
-        const text = await response.text();
-        console.error(`❌ API Hatası (text):`, text);
-        errorMessage = text || errorMessage;
+      } catch {
+        const htmlMatch = bodyText.match(/<pre>([^<]+)<\/pre>/i);
+        errorMessage = htmlMatch?.[1]?.trim() || bodyText || errorMessage;
+        console.error(`❌ API Hatası (text):`, errorMessage);
       }
       throw new Error(errorMessage);
     }
@@ -133,6 +135,7 @@ function transformModel(model: any): Model {
     name: model.name,
     stockCode: model.stock_code || model.stockCode,
     category: model.category,
+    metalType: model.metal_type || model.metalType || undefined,
     image: model.image,
     stones: model.stones || [],
   };
@@ -196,6 +199,7 @@ export const modelsAPI = {
         name: model.name,
         stockCode: model.stockCode,
         category: model.category,
+        metalType: model.metalType,
         image: model.image,
         stones: model.stones,
       }),
@@ -210,6 +214,7 @@ export const modelsAPI = {
         name: model.name,
         stockCode: model.stockCode,
         category: model.category,
+        metalType: model.metalType,
         image: model.image,
         stones: model.stones,
       }),
@@ -281,19 +286,166 @@ export interface CompanySettings {
   email?: string;
   website?: string;
   logo?: string | null;
+  savedLocally?: boolean;
 }
+
+const COMPANY_SETTINGS_STORAGE_KEY = 'companySettings';
+
+const defaultCompanySettings = (): CompanySettings => ({
+  id: '00000000-0000-0000-0000-000000000000',
+  companyName: 'MercanSoft',
+  legalName: '',
+  taxOffice: '',
+  taxNumber: '',
+  address: '',
+  phone: '',
+  email: '',
+  website: '',
+  logo: null,
+});
+
+const readLocalCompanySettings = (): CompanySettings | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const saved = localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
+  if (!saved) {
+    return null;
+  }
+
+  try {
+    return { ...defaultCompanySettings(), ...JSON.parse(saved) };
+  } catch {
+    return null;
+  }
+};
+
+const writeLocalCompanySettings = (settings: Partial<CompanySettings>): CompanySettings => {
+  const { savedLocally: _savedLocally, ...settingsToSave } = settings;
+  const merged = { ...defaultCompanySettings(), ...readLocalCompanySettings(), ...settingsToSave, savedLocally: true };
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(
+      COMPANY_SETTINGS_STORAGE_KEY,
+      JSON.stringify({ ...settingsToSave })
+    );
+  }
+  return merged;
+};
+
+const isCompanySettingsUnavailable = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('404') ||
+    message.includes('Cannot GET /api/company-settings') ||
+    message.includes('Cannot PUT /api/company-settings')
+  );
+};
 
 // Company Settings API
 export const companySettingsAPI = {
   get: async (): Promise<CompanySettings> => {
-    return fetchAPI<CompanySettings>('/api/company-settings');
+    try {
+      return await fetchAPI<CompanySettings>('/api/company-settings');
+    } catch (error) {
+      if (isCompanySettingsUnavailable(error)) {
+        return readLocalCompanySettings() ?? defaultCompanySettings();
+      }
+      throw error;
+    }
   },
 
   update: async (settings: Partial<CompanySettings>): Promise<CompanySettings> => {
-    return fetchAPI<CompanySettings>('/api/company-settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    });
+    try {
+      return await fetchAPI<CompanySettings>('/api/company-settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      });
+    } catch (error) {
+      if (isCompanySettingsUnavailable(error)) {
+        return writeLocalCompanySettings(settings);
+      }
+      throw error;
+    }
+  },
+};
+
+const RECEIPT_SETTINGS_STORAGE_KEY = 'receiptSettings';
+
+const isReceiptSettingsUnavailable = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('404') ||
+    message.includes('Cannot GET /api/receipt-settings') ||
+    message.includes('Cannot PUT /api/receipt-settings')
+  );
+};
+
+const readLocalReceiptSettings = (): ReceiptSettings => {
+  if (typeof window === 'undefined') {
+    return defaultReceiptSettings();
+  }
+
+  const saved = localStorage.getItem(RECEIPT_SETTINGS_STORAGE_KEY);
+  if (!saved) {
+    return defaultReceiptSettings();
+  }
+
+  try {
+    return mergeReceiptSettings(JSON.parse(saved));
+  } catch {
+    return defaultReceiptSettings();
+  }
+};
+
+const writeLocalReceiptSettings = (settings: Partial<ReceiptSettings>): ReceiptSettings => {
+  const merged = mergeReceiptSettings({
+    ...readLocalReceiptSettings(),
+    ...settings,
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(RECEIPT_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+  }
+
+  return merged;
+};
+
+export const receiptSettingsAPI = {
+  get: async (): Promise<ReceiptSettings> => {
+    try {
+      const response = await fetchAPI<{ settings?: Partial<ReceiptSettings> }>('/api/receipt-settings');
+      const merged = mergeReceiptSettings(response.settings || {});
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(RECEIPT_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+      }
+      return merged;
+    } catch (error) {
+      if (isReceiptSettingsUnavailable(error)) {
+        return readLocalReceiptSettings();
+      }
+      throw error;
+    }
+  },
+
+  update: async (settings: ReceiptSettings): Promise<ReceiptSettings> => {
+    const merged = mergeReceiptSettings(settings);
+    try {
+      const response = await fetchAPI<{ settings?: Partial<ReceiptSettings> }>('/api/receipt-settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings: merged }),
+      });
+      const saved = mergeReceiptSettings(response.settings || merged);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(RECEIPT_SETTINGS_STORAGE_KEY, JSON.stringify(saved));
+      }
+      return saved;
+    } catch (error) {
+      if (isReceiptSettingsUnavailable(error)) {
+        return writeLocalReceiptSettings(merged);
+      }
+      throw error;
+    }
   },
 };
 

@@ -16,11 +16,14 @@ export interface StoneSet {
 }
 
 // Model için tip tanımı
+export type MetalType = 'altın' | 'gümüş';
+
 export interface Model {
   id: string;
   name: string;
   stockCode?: string; // Opsiyonel stok kodu
   category?: string; // Opsiyonel kategori
+  metalType?: MetalType; // Altın / gümüş ayrımı
   image?: string; // Base64 formatında resim
   stones: Array<{
     stoneId: string;
@@ -49,6 +52,12 @@ export interface CalculationHistoryItem {
   productionCount: number;
   totalWeight: number;
   timestamp: string; // ISO date string
+  stoneDetails?: Array<{
+    stoneId: string;
+    stoneName: string;
+    quantity: number;
+    totalWeight: number;
+  }>;
 }
 
 // Uygulama durumu için tip tanımı
