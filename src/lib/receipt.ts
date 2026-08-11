@@ -161,11 +161,8 @@ export function buildReceiptHtml(
         const qty = Number(stone.quantity || 0);
         const weight = Number(stone.totalWeight || 0).toFixed(3);
         return `<div class="stone-row">
-          <div class="stone-name">${name}</div>
-          <div class="stone-meta">
-            <span>${qty} adet</span>
-            <span>${weight} gr</span>
-          </div>
+          <div class="stone-name">${name} x ${qty} Adet</div>
+          <div class="stone-weight">${weight} gr</div>
         </div>`;
       })
       .join('');
@@ -303,18 +300,20 @@ export function buildReceiptHtml(
         margin-bottom: 1.5mm;
       }
       .stone-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: ${settings.columnSpacing}px;
         padding: 1.2mm 0;
       }
       .stone-name {
+        flex: 1;
         font-size: ${settings.fontSize}px;
         font-weight: 500;
         word-break: break-word;
-        margin-bottom: 0.5mm;
       }
-      .stone-meta {
-        display: flex;
-        justify-content: space-between;
-        gap: ${settings.columnSpacing}px;
+      .stone-weight {
+        flex-shrink: 0;
         font-size: ${Math.max(8, settings.fontSize - 1)}px;
         color: #555;
       }

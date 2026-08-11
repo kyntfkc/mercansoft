@@ -402,18 +402,22 @@ export default function ReceiptSettings() {
               Taş Detayları
             </Typography>
             {previewData.stones.map((stone) => (
-              <Box key={stone.stoneName} sx={{ py: 0.4 }}>
-                <Typography sx={{ fontSize: settings.fontSize, fontWeight: 500, mb: 0.15 }}>
-                  {stone.stoneName}
+              <Box
+                key={stone.stoneName}
+                sx={{
+                  py: 0.4,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  gap: 1,
+                }}
+              >
+                <Typography sx={{ fontSize: settings.fontSize, fontWeight: 500, flex: 1 }}>
+                  {stone.stoneName} x {stone.quantity} Adet
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                  <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555' }}>
-                    {stone.quantity} adet
-                  </Typography>
-                  <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555' }}>
-                    {stone.totalWeight.toFixed(3)} gr
-                  </Typography>
-                </Box>
+                <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555', flexShrink: 0 }}>
+                  {stone.totalWeight.toFixed(3)} gr
+                </Typography>
               </Box>
             ))}
           </Box>
