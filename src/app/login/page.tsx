@@ -12,7 +12,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { authAPI } from '../../lib/api';
-import { DEFAULT_LOGO, getCachedCompanyLogo, removeLogoWhiteBackground } from '../../lib/logo';
+import { DEFAULT_LOGO, BRAND_LOGO_SX } from '../../lib/logo';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function LoginPage() {
@@ -22,23 +22,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/');
     }
   }, [isAuthenticated, router]);
-
-  // Daha önce kaydedildiyse (Firma Ayarları) giriş ekranında da logo göster
-  useEffect(() => {
-    const cached = getCachedCompanyLogo();
-    if (!cached) {
-      setCompanyLogo(DEFAULT_LOGO);
-      return;
-    }
-    removeLogoWhiteBackground(cached).then(setCompanyLogo);
-  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -59,88 +48,110 @@ export default function LoginPage() {
   return (
     <Box
       sx={{
+        position: 'relative',
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: '#f5f7fb',
+        background: 'linear-gradient(to bottom right, #f8fafc, rgba(239,246,255,0.3), rgba(238,242,255,0.5))',
         px: 2,
+        py: 4,
       }}
     >
-      <Paper
-        elevation={4}
+      <Box
         sx={{
-          maxWidth: 420,
+          position: 'relative',
+          display: 'flex',
           width: '100%',
-          p: 4,
-          borderRadius: 3,
+          maxWidth: 420,
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 3,
         }}
       >
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          {companyLogo && (
-            <Box
-              component="img"
-              src={companyLogo}
-              alt="Firma Logosu"
-              sx={{
-                height: 120,
-                maxWidth: 360,
-                width: 'auto',
-                objectFit: 'contain',
-                display: 'block',
-                mx: 'auto',
-                mb: 2,
-              }}
-              onError={() => setCompanyLogo(DEFAULT_LOGO)}
-            />
-          )}
-          <Typography variant="h5" fontWeight={600}>
-            Giriş
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Lütfen kullanıcı adı ve şifrenizi girin
-          </Typography>
-        </Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            label="Kullanıcı Adı"
-            fullWidth
-            margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
+        <Box sx={{ textAlign: 'center' }}>
+          <Box
+            component="img"
+            src={DEFAULT_LOGO}
+            alt="indigo"
+            sx={{ ...BRAND_LOGO_SX, mx: 'auto' }}
           />
-          <TextField
-            label="Şifre"
-            type="password"
-            fullWidth
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            fullWidth
-            size="large"
-            sx={{ mt: 2 }}
-            disabled={loading}
+          <Typography
+            sx={{
+              mt: 1,
+              color: '#64748B',
+              fontSize: '0.875rem',
+            }}
           >
-            {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Giriş Yap'}
-          </Button>
+            indigo | Taş Hesaplama Sistemi
+          </Typography>
         </Box>
-      </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{
+            width: '100%',
+            p: 4,
+            borderRadius: 3,
+            bgcolor: '#ffffff',
+            boxShadow: '0 4px 24px rgba(15, 23, 42, 0.08)',
+            border: '1px solid rgba(226, 232, 240, 0.9)',
+          }}
+        >
+          <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5, color: '#0f172a' }}>
+            Giriş yap
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#64748B' }}>
+            Hesaplamayı kullanmak için oturum açın
+          </Typography>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={handleSubmit}>
+            <TextField
+              label="Kullanıcı Adı"
+              fullWidth
+              margin="normal"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+            />
+            <TextField
+              label="Şifre"
+              type="password"
+              fullWidth
+              margin="normal"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              size="large"
+              sx={{
+                mt: 2,
+                bgcolor: '#0f172a',
+                color: '#fff',
+                textTransform: 'none',
+                fontWeight: 600,
+                py: 1.25,
+                borderRadius: 2,
+                '&:hover': { bgcolor: '#1e293b' },
+              }}
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Giriş yap'}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
     </Box>
   );
 }
-

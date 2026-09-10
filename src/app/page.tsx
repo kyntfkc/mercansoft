@@ -45,7 +45,7 @@ import { useRouter } from 'next/navigation';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import { companySettingsAPI } from '../lib/api';
-import { DEFAULT_LOGO, resolveLogoUrl, getCachedCompanyLogo, cacheCompanyLogo, removeLogoWhiteBackground } from '../lib/logo';
+import { DEFAULT_LOGO, BRAND_LOGO_SX, getCachedCompanyLogo, cacheCompanyLogo } from '../lib/logo';
 
 // Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
 const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
@@ -109,15 +109,9 @@ function HomeContent() {
   // Client-side mount kontrolü
   useEffect(() => {
     setIsMounted(true);
-    const cached = getCachedCompanyLogo();
-    if (cached) {
-      removeLogoWhiteBackground(cached).then((clean) => {
-        setCompanyLogo(clean);
-        setLogoReady(true);
-      });
-    } else {
-      setLogoReady(true);
-    }
+    // gram-hesap gibi marka logosunu kullan (şeffaf, doğru kırpılmış)
+    setCompanyLogo(DEFAULT_LOGO);
+    setLogoReady(true);
   }, []);
 
   useEffect(() => {
@@ -126,7 +120,7 @@ function HomeContent() {
     }
   }, [isMounted, isAuthenticated, router]);
 
-  // Company settings'ten logoyu backend'den yükle
+  // Firma ayarlarından logo gelirse cache'le (fiş vb. için); header marka logosunu koru
   useEffect(() => {
     if (!isMounted || !isAuthenticated) return;
 
@@ -136,28 +130,14 @@ function HomeContent() {
       try {
         const settings = await companySettingsAPI.get();
         if (cancelled) return;
-
         if (settings.logo && settings.logo.trim() !== '') {
-          const url = resolveLogoUrl(settings.logo);
-          const clean = await removeLogoWhiteBackground(url);
-          if (cancelled) return;
-          setCompanyLogo(clean);
           cacheCompanyLogo(settings.logo);
-          return;
         }
-
-        setCompanyLogo(DEFAULT_LOGO);
-        cacheCompanyLogo(null);
       } catch (error) {
         console.error('Backend\'den logo yüklenirken hata:', error);
-        if (cancelled) return;
-
-        const cached = getCachedCompanyLogo();
-        if (cached) {
-          const clean = await removeLogoWhiteBackground(cached);
-          if (!cancelled) setCompanyLogo(clean);
-        } else {
-          setCompanyLogo(DEFAULT_LOGO);
+        if (!cancelled) {
+          const cached = getCachedCompanyLogo();
+          if (cached) cacheCompanyLogo(cached);
         }
       }
     };
@@ -251,14 +231,14 @@ function HomeContent() {
           </Button>
         </Box>
       <Zoom in={showContent} timeout={600}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 520 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, minHeight: 140 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
+          <Box sx={{ textAlign: 'center', width: '100%' }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               {companyLogo && (
                 <Box
                   component="img"
                   src={companyLogo}
-                  alt="Firma Logosu"
+                  alt="indigo"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     if (!target.src.endsWith(DEFAULT_LOGO)) {
@@ -271,13 +251,7 @@ function HomeContent() {
                       fallback.style.display = 'flex';
                     }
                   }}
-                  sx={{
-                    height: 140,
-                    maxWidth: 420,
-                    width: 'auto',
-                    objectFit: 'contain',
-                    display: 'block',
-                  }}
+                  sx={BRAND_LOGO_SX}
                 />
               )}
               <Box
@@ -288,19 +262,20 @@ function HomeContent() {
                   gap: 1
                 }}
               >
-                <DiamondIcon sx={{ fontSize: 48, color: '#225C73' }} />
-                <Typography variant="h3" component="h1" fontWeight="bold" color="#225C73">
+                <DiamondIcon sx={{ fontSize: 28, color: '#225C73' }} />
+                <Typography variant="h5" component="h1" fontWeight="bold" color="#225C73">
                   MercanSoft
                 </Typography>
               </Box>
             </Box>
             <Typography
-              variant="body1"
               sx={{
-                color: '#4B5563',
-                fontWeight: 500,
-                letterSpacing: '0.02em',
-                fontSize: '0.95rem',
+                mt: 0.5,
+                mx: 'auto',
+                maxWidth: 560,
+                color: '#64748B',
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
               }}
             >
               Gelişmiş Taş Hesaplama Sistemi

@@ -1,6 +1,15 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-678d.up.railway.app';
 
-export const DEFAULT_LOGO = '/company-logo.svg';
+export const DEFAULT_LOGO = '/logo-indigo.png';
+
+/** gram-hesap ile aynı logo boyutları */
+export const BRAND_LOGO_SX = {
+  height: { xs: '2.925rem', md: '3.25rem' },
+  width: 'auto',
+  maxWidth: '100%',
+  objectFit: 'contain' as const,
+  display: 'block',
+};
 
 export function resolveLogoUrl(logo?: string | null): string {
   if (!logo || logo.trim() === '') {
