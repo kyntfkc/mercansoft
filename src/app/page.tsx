@@ -45,7 +45,7 @@ import { useRouter } from 'next/navigation';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import { companySettingsAPI } from '../lib/api';
-import { DEFAULT_LOGO, resolveLogoUrl } from '../lib/logo';
+import { DEFAULT_LOGO, resolveLogoUrl, getCachedCompanyLogo, cacheCompanyLogo } from '../lib/logo';
 
 // Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
 const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
@@ -104,10 +104,16 @@ function HomeContent() {
   const [hasSynced, setHasSynced] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [logoReady, setLogoReady] = useState(false);
 
   // Client-side mount kontrolü
   useEffect(() => {
     setIsMounted(true);
+    const cached = getCachedCompanyLogo();
+    if (cached) {
+      setCompanyLogo(cached);
+    }
+    setLogoReady(true);
   }, []);
 
   useEffect(() => {
@@ -118,37 +124,37 @@ function HomeContent() {
 
   // Company settings'ten logoyu backend'den yükle
   useEffect(() => {
+    if (!isMounted || !isAuthenticated) return;
+
+    let cancelled = false;
+
     const loadLogo = async () => {
-      if (isMounted && isAuthenticated) {
-        try {
-          const settings = await companySettingsAPI.get();
-          if (settings.logo && settings.logo.trim() !== '') {
-            setCompanyLogo(resolveLogoUrl(settings.logo));
-            return;
-          }
-        } catch (error) {
-          console.error('Backend\'den logo yüklenirken hata:', error);
-          // Fallback: localStorage'dan yükle
-          if (typeof window !== 'undefined') {
-            const savedSettings = localStorage.getItem('companySettings');
-            if (savedSettings) {
-              try {
-                const localSettings = JSON.parse(savedSettings);
-                if (localSettings.logo && localSettings.logo.trim() !== '') {
-                  setCompanyLogo(resolveLogoUrl(localSettings.logo));
-                  return;
-                }
-              } catch (e) {
-                console.error('LocalStorage\'dan logo yüklenirken hata:', e);
-              }
-            }
-          }
+      try {
+        const settings = await companySettingsAPI.get();
+        if (cancelled) return;
+
+        if (settings.logo && settings.logo.trim() !== '') {
+          const url = resolveLogoUrl(settings.logo);
+          setCompanyLogo(url);
+          cacheCompanyLogo(settings.logo);
+          return;
         }
+
+        setCompanyLogo(DEFAULT_LOGO);
+        cacheCompanyLogo(null);
+      } catch (error) {
+        console.error('Backend\'den logo yüklenirken hata:', error);
+        if (cancelled) return;
+
+        const cached = getCachedCompanyLogo();
+        setCompanyLogo(cached || DEFAULT_LOGO);
       }
-      // Varsayılan logo'yu göster
-      setCompanyLogo(DEFAULT_LOGO);
     };
+
     loadLogo();
+    return () => {
+      cancelled = true;
+    };
   }, [isMounted, isAuthenticated]);
 
   // Uygulama açıldığında backend'den veri çek (sadece bir kez, client-side'da)
@@ -238,45 +244,32 @@ function HomeContent() {
           <Paper 
             elevation={3} 
             sx={{ 
-              p: 2, 
-              borderRadius: 2, 
+              px: 3,
+              py: 2.75,
+              borderRadius: 3, 
               mb: 3, 
               textAlign: 'center',
-              background: 'linear-gradient(to right, #225C73, #5E8A9A)',
+              background: 'linear-gradient(135deg, #1B4F63 0%, #225C73 45%, #5E8A9A 100%)',
               color: 'white',
               position: 'relative',
               overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(34, 92, 115, 0.3)',
-              maxWidth: '350px',
+              boxShadow: '0 8px 28px rgba(34, 92, 115, 0.35)',
+              maxWidth: '440px',
               width: '100%'
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.95)',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 0.75,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                }}
-              >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, minHeight: 88 }}>
+              {companyLogo && (
                 <Box
                   component="img"
-                  src={companyLogo || DEFAULT_LOGO}
+                  src={companyLogo}
                   alt="Firma Logosu"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    const defaultLogo = window.location.origin + DEFAULT_LOGO;
-
-                    if (!target.src.endsWith(DEFAULT_LOGO) && target.src !== defaultLogo) {
+                    if (!target.src.endsWith(DEFAULT_LOGO)) {
                       target.src = DEFAULT_LOGO;
                       return;
                     }
-
                     target.style.display = 'none';
                     const fallback = document.querySelector('.logo-fallback') as HTMLElement;
                     if (fallback) {
@@ -284,33 +277,43 @@ function HomeContent() {
                     }
                   }}
                   sx={{
-                    maxHeight: 48,
-                    maxWidth: 200,
+                    height: 88,
+                    maxWidth: 280,
+                    width: 'auto',
                     objectFit: 'contain',
                     display: 'block',
+                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))',
                   }}
                 />
-              </Box>
+              )}
               {/* Logo yüklenemezse fallback göster */}
               <Box
                 className="logo-fallback"
                 sx={{
-                  display: 'none',
+                  display: companyLogo || !logoReady ? 'none' : 'flex',
                   alignItems: 'center',
                   gap: 1
                 }}
               >
                 <DiamondIcon sx={{ 
-                  fontSize: 24, 
+                  fontSize: 36, 
                   color: 'white', 
                   filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.5))'
                 }} />
-                <Typography variant="h5" component="h1" fontWeight="bold">
+                <Typography variant="h4" component="h1" fontWeight="bold">
                   MercanSoft
                 </Typography>
               </Box>
             </Box>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+            <Typography
+              variant="body1"
+              sx={{
+                opacity: 0.95,
+                fontWeight: 500,
+                letterSpacing: '0.02em',
+                fontSize: '0.95rem',
+              }}
+            >
               Gelişmiş Taş Hesaplama Sistemi
             </Typography>
           </Paper>

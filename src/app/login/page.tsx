@@ -12,7 +12,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { authAPI } from '../../lib/api';
-import { DEFAULT_LOGO, resolveLogoUrl } from '../../lib/logo';
+import { DEFAULT_LOGO, getCachedCompanyLogo } from '../../lib/logo';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function LoginPage() {
@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [companyLogo, setCompanyLogo] = useState<string>(DEFAULT_LOGO);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -32,17 +32,8 @@ export default function LoginPage() {
 
   // Daha önce kaydedildiyse (Firma Ayarları) giriş ekranında da logo göster
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = localStorage.getItem('companySettings');
-      if (!saved) return;
-      const parsed = JSON.parse(saved);
-      if (parsed?.logo && String(parsed.logo).trim() !== '') {
-        setCompanyLogo(resolveLogoUrl(parsed.logo));
-      }
-    } catch (e) {
-      console.warn('Logo yüklenemedi:', e);
-    }
+    const cached = getCachedCompanyLogo();
+    setCompanyLogo(cached || DEFAULT_LOGO);
   }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -82,22 +73,24 @@ export default function LoginPage() {
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Box
-            component="img"
-            src={companyLogo}
-            alt="Firma Logosu"
-            sx={{
-              height: 58,
-              maxWidth: 260,
-              width: 'auto',
-              objectFit: 'contain',
-              display: 'block',
-              mx: 'auto',
-              mb: 2,
-              filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.12))',
-            }}
-            onError={() => setCompanyLogo(DEFAULT_LOGO)}
-          />
+          {companyLogo && (
+            <Box
+              component="img"
+              src={companyLogo}
+              alt="Firma Logosu"
+              sx={{
+                height: 88,
+                maxWidth: 280,
+                width: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+                mx: 'auto',
+                mb: 2,
+                filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))',
+              }}
+              onError={() => setCompanyLogo(DEFAULT_LOGO)}
+            />
+          )}
           <Typography variant="h5" fontWeight={600}>
             Giriş
           </Typography>

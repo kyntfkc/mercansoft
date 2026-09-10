@@ -21,3 +21,31 @@ export function resolveLogoUrl(logo?: string | null): string {
 
   return logo;
 }
+
+/** localStorage'daki firma logosunu senkron oku (SSR'da null). */
+export function getCachedCompanyLogo(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = localStorage.getItem('companySettings');
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed?.logo && String(parsed.logo).trim() !== '') {
+      return resolveLogoUrl(parsed.logo);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function cacheCompanyLogo(logo?: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    const saved = localStorage.getItem('companySettings');
+    const parsed = saved ? JSON.parse(saved) : {};
+    parsed.logo = logo || null;
+    localStorage.setItem('companySettings', JSON.stringify(parsed));
+  } catch {
+    // ignore
+  }
+}
