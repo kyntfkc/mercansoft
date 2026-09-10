@@ -1,0 +1,5 @@
+backend/backups
+backend/node_modules
+backend/uploads
+node_modules
+.next

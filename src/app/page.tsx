@@ -45,6 +45,7 @@ import { useRouter } from 'next/navigation';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import { companySettingsAPI } from '../lib/api';
+import { DEFAULT_LOGO, resolveLogoUrl } from '../lib/logo';
 
 // Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
 const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
@@ -122,7 +123,7 @@ function HomeContent() {
         try {
           const settings = await companySettingsAPI.get();
           if (settings.logo && settings.logo.trim() !== '') {
-            setCompanyLogo(settings.logo);
+            setCompanyLogo(resolveLogoUrl(settings.logo));
             return;
           }
         } catch (error) {
@@ -134,7 +135,7 @@ function HomeContent() {
               try {
                 const localSettings = JSON.parse(savedSettings);
                 if (localSettings.logo && localSettings.logo.trim() !== '') {
-                  setCompanyLogo(localSettings.logo);
+                  setCompanyLogo(resolveLogoUrl(localSettings.logo));
                   return;
                 }
               } catch (e) {
@@ -145,7 +146,7 @@ function HomeContent() {
         }
       }
       // Varsayılan logo'yu göster
-      setCompanyLogo('/company-logo.svg');
+      setCompanyLogo(DEFAULT_LOGO);
     };
     loadLogo();
   }, [isMounted, isAuthenticated]);
@@ -252,37 +253,44 @@ function HomeContent() {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
               <Box
-                component="img"
-                src={companyLogo || '/company-logo.svg'}
-                alt="Firma Logosu"
-                onError={(e) => {
-                  // Logo yüklenemezse varsayılan logo'yu göster
-                  const target = e.target as HTMLImageElement;
-                  const currentSrc = target.src;
-                  const defaultLogo = window.location.origin + '/company-logo.svg';
-                  
-                  if (currentSrc !== defaultLogo && currentSrc !== window.location.origin + '/company-logo.svg') {
-                    // Özel logo yüklenemezse varsayılan logo'yu dene
-                    target.src = '/company-logo.svg';
-                  } else {
-                    // Varsayılan logo da yüklenemezse icon göster
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.95)',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 0.75,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+              >
+                <Box
+                  component="img"
+                  src={companyLogo || DEFAULT_LOGO}
+                  alt="Firma Logosu"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    const defaultLogo = window.location.origin + DEFAULT_LOGO;
+
+                    if (!target.src.endsWith(DEFAULT_LOGO) && target.src !== defaultLogo) {
+                      target.src = DEFAULT_LOGO;
+                      return;
+                    }
+
                     target.style.display = 'none';
                     const fallback = document.querySelector('.logo-fallback') as HTMLElement;
                     if (fallback) {
                       fallback.style.display = 'flex';
                     }
-                  }
-                }}
-                sx={{
-                  maxHeight: 56,
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                  borderRadius: 3,
-                  padding: 0.5,
-                  filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.25))',
-                  backgroundColor: 'rgba(255,255,255,0.08)'
-                }}
-              />
+                  }}
+                  sx={{
+                    maxHeight: 48,
+                    maxWidth: 200,
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
+              </Box>
               {/* Logo yüklenemezse fallback göster */}
               <Box
                 className="logo-fallback"

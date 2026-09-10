@@ -35,9 +35,14 @@ import {
   OutlinedInput,
   InputAdornment,
   FormControlLabel,
-  Checkbox
+  Checkbox,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
 import { useStore } from '../store/useStore';
+import { matchesAnySearch } from '@/lib/search';
+import { getMetalTypeLabel, matchesMetalTypeFilter, MetalType, MetalTypeFilter } from '@/lib/metalType';
+import MetalTypeToggle from '@/components/MetalTypeToggle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
@@ -65,12 +70,14 @@ export default function ModelManager() {
     name: string;
     stockCode?: string;
     category?: string;
+    metalType?: MetalType;
     image?: string;
     stones: ModelStone[];
   }>({
     name: '',
     stockCode: '',
     category: '',
+    metalType: undefined,
     stones: [],
     image: undefined,
   });
@@ -92,6 +99,7 @@ export default function ModelManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [metalFilter, setMetalFilter] = useState<MetalTypeFilter>('all');
 
   const handleOpen = () => {
     setOpen(true);
@@ -103,6 +111,7 @@ export default function ModelManager() {
       name: '', 
       stockCode: '', 
       category: '',
+      metalType: undefined,
       stones: [], 
       image: undefined 
     });
@@ -121,6 +130,7 @@ export default function ModelManager() {
     name: string;
     stockCode?: string;
     category?: string;
+    metalType?: MetalType;
     image?: string;
     stones: ModelStone[];
   }) => {
@@ -129,6 +139,7 @@ export default function ModelManager() {
       name: model.name,
       stockCode: model.stockCode || '',
       category: model.category || '',
+      metalType: model.metalType,
       image: model.image,
       stones: [...model.stones],
     });
@@ -149,12 +160,14 @@ export default function ModelManager() {
     // Boş stringi undefined'a çevir
     const stockCode = editingModel.stockCode?.trim() === '' ? undefined : editingModel.stockCode;
     const category = editingModel.category?.trim() === '' ? undefined : editingModel.category;
+    const metalType = editingModel.metalType;
     
     if (isEditing && editingModel.id) {
       await updateModel(editingModel.id, {
         name: editingModel.name,
         stockCode: stockCode,
         category: category,
+        metalType: metalType,
         image: editingModel.image,
         stones: editingModel.stones,
       });
@@ -163,6 +176,7 @@ export default function ModelManager() {
         name: editingModel.name,
         stockCode: stockCode,
         category: category,
+        metalType: metalType,
         image: editingModel.image,
         stones: editingModel.stones,
       });
@@ -277,15 +291,20 @@ export default function ModelManager() {
   // Filtreleme fonksiyonu
   const filteredModels = models.filter(model => {
     // Arama sorgusu kontrolü
-    const matchesSearch = searchQuery === '' || 
-      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (model.stockCode && model.stockCode.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = matchesAnySearch(
+      searchQuery,
+      model.name,
+      model.stockCode,
+      model.category
+    );
     
     // Kategori filtresi kontrolü
     const matchesCategory = !selectedCategory || 
       (model.category && model.category === selectedCategory);
+
+    const matchesMetal = matchesMetalTypeFilter(model.metalType, metalFilter);
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesMetal;
   });
   
   // Sayfalanmış modeller
@@ -316,6 +335,10 @@ export default function ModelManager() {
                 >
                   Yeni Model Ekle
                 </Button>
+              </Box>
+
+              <Box sx={{ mb: 2, maxWidth: 360 }}>
+                <MetalTypeToggle value={metalFilter} onChange={setMetalFilter} />
               </Box>
               
               {/* Arama ve Filtreleme Alanı */}
@@ -394,6 +417,7 @@ export default function ModelManager() {
                           <TableCell>Model Adı</TableCell>
                           <TableCell>Stok Kodu</TableCell>
                           <TableCell>Kategori</TableCell>
+                          <TableCell>Metal</TableCell>
                           <TableCell align="right">Toplam Taş</TableCell>
                           <TableCell align="right">İşlemler</TableCell>
                         </TableRow>
@@ -440,6 +464,7 @@ export default function ModelManager() {
                               <TableCell>{model.name}</TableCell>
                               <TableCell>{model.stockCode || '-'}</TableCell>
                               <TableCell>{model.category || '-'}</TableCell>
+                              <TableCell>{getMetalTypeLabel(model.metalType)}</TableCell>
                               <TableCell align="right">{totalStones}</TableCell>
                               <TableCell align="right">
                                 <Tooltip title="Görüntüle">
@@ -540,6 +565,28 @@ export default function ModelManager() {
                   ))}
                 </Select>
               </FormControl>
+
+              <Box sx={{ mt: 1.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                  Metal Türü
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={editingModel.metalType || ''}
+                  onChange={(_, value: MetalType | '') => {
+                    setEditingModel({
+                      ...editingModel,
+                      metalType: value || undefined,
+                    });
+                  }}
+                  fullWidth
+                >
+                  <ToggleButton value="">Belirtilmedi</ToggleButton>
+                  <ToggleButton value="altın">Altın</ToggleButton>
+                  <ToggleButton value="gümüş">Gümüş</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
             </Grid>
             
             <Grid item xs={12} sm={5}>
@@ -716,6 +763,11 @@ export default function ModelManager() {
                 {viewingModel.category && (
                   <Typography variant="body2" color="text.secondary">
                     Kategori: {viewingModel.category}
+                  </Typography>
+                )}
+                {viewingModel.metalType && (
+                  <Typography variant="body2" color="text.secondary">
+                    Metal: {getMetalTypeLabel(viewingModel.metalType)}
                   </Typography>
                 )}
                 <Typography variant="body2" color="text.secondary" paragraph>

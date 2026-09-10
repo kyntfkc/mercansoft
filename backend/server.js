@@ -70,10 +70,15 @@ async function initDatabase() {
         name VARCHAR(255) NOT NULL,
         stock_code VARCHAR(100),
         category VARCHAR(100),
+        metal_type VARCHAR(20),
         image TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    await pool.query(`
+      ALTER TABLE models ADD COLUMN IF NOT EXISTS metal_type VARCHAR(20)
     `);
 
     // Model stones junction table
@@ -141,6 +146,22 @@ async function initDatabase() {
     await pool.query(`
       INSERT INTO company_settings (id, company_name)
       VALUES ('00000000-0000-0000-0000-000000000000'::uuid, 'MercanSoft')
+      ON CONFLICT (id) DO NOTHING
+    `);
+
+    // Receipt settings table (tek satır, JSONB)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receipt_settings (
+        id UUID PRIMARY KEY DEFAULT '00000000-0000-0000-0000-000000000000'::uuid,
+        settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      INSERT INTO receipt_settings (id, settings)
+      VALUES ('00000000-0000-0000-0000-000000000000'::uuid, '{}'::jsonb)
       ON CONFLICT (id) DO NOTHING
     `);
 
@@ -325,7 +346,7 @@ app.get('/api/models', authenticate, async (req, res) => {
 
 app.post('/api/models', authenticate, async (req, res) => {
   try {
-    const { name, stockCode, category, image, stones } = req.body;
+    const { name, stockCode, category, metalType, image, stones } = req.body;
     const client = await pool.connect();
     
     try {
@@ -333,8 +354,8 @@ app.post('/api/models', authenticate, async (req, res) => {
       
       // Önce model'i oluştur (ID'yi almak için)
       const modelResult = await client.query(
-        'INSERT INTO models (name, stock_code, category) VALUES ($1, $2, $3) RETURNING *',
-        [name, stockCode || null, category || null]
+        'INSERT INTO models (name, stock_code, category, metal_type) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, stockCode || null, category || null, metalType || null]
       );
       
       const model = modelResult.rows[0];
@@ -397,7 +418,7 @@ app.post('/api/models', authenticate, async (req, res) => {
 app.put('/api/models/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, stockCode, category, image, stones } = req.body;
+    const { name, stockCode, category, metalType, image, stones } = req.body;
     const client = await pool.connect();
     
     try {
@@ -431,8 +452,8 @@ app.put('/api/models/:id', authenticate, async (req, res) => {
       }
       
       await client.query(
-        'UPDATE models SET name = $1, stock_code = $2, category = $3, image = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
-        [name, stockCode || null, category || null, imageUrl, id]
+        'UPDATE models SET name = $1, stock_code = $2, category = $3, metal_type = $4, image = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6',
+        [name, stockCode || null, category || null, metalType || null, imageUrl, id]
       );
       
       await client.query('DELETE FROM model_stones WHERE model_id = $1', [id]);
@@ -895,6 +916,57 @@ app.put('/api/company-settings', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Company settings güncelleme hatası:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API Routes - Receipt Settings
+app.get('/api/receipt-settings', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM receipt_settings WHERE id = $1',
+      ['00000000-0000-0000-0000-000000000000']
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ settings: {} });
+    }
+
+    res.json({
+      id: result.rows[0].id,
+      settings: result.rows[0].settings || {},
+      updatedAt: result.rows[0].updated_at,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/receipt-settings', authenticate, async (req, res) => {
+  try {
+    const settings = req.body?.settings ?? req.body;
+
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(400).json({ error: 'Geçersiz fiş ayarları' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO receipt_settings (id, settings, updated_at)
+       VALUES ('00000000-0000-0000-0000-000000000000'::uuid, $1::jsonb, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE SET
+         settings = EXCLUDED.settings,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [JSON.stringify(settings)]
+    );
+
+    res.json({
+      id: result.rows[0].id,
+      settings: result.rows[0].settings || {},
+      updatedAt: result.rows[0].updated_at,
+    });
+  } catch (error) {
+    console.error('Receipt settings güncelleme hatası:', error);
     res.status(500).json({ error: error.message });
   }
 });

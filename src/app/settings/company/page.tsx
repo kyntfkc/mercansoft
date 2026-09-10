@@ -23,6 +23,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import { companySettingsAPI } from '@/lib/api';
+import { DEFAULT_LOGO, resolveLogoUrl } from '@/lib/logo';
 
 export default function CompanySettings() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function CompanySettings() {
     phone: '',
     email: '',
     website: '',
-    logo: '/company-logo.svg' as string | null,
+    logo: DEFAULT_LOGO as string | null,
   });
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -55,7 +56,7 @@ export default function CompanySettings() {
           phone: backendSettings.phone || '',
           email: backendSettings.email || '',
           website: backendSettings.website || '',
-          logo: backendSettings.logo || '/company-logo.svg',
+          logo: backendSettings.logo || DEFAULT_LOGO,
         });
       } catch (error) {
         console.error('Backend\'den ayarlar yüklenirken hata:', error);
@@ -153,8 +154,7 @@ export default function CompanySettings() {
 
   const handleSave = async () => {
     try {
-      // Backend'e kaydet
-      await companySettingsAPI.update({
+      const updated = await companySettingsAPI.update({
         companyName: settings.companyName,
         legalName: settings.legalName,
         taxOffice: settings.taxOffice,
@@ -165,13 +165,30 @@ export default function CompanySettings() {
         website: settings.website,
         logo: settings.logo,
       });
-      
-      // LocalStorage'a da kaydet (fallback için)
+
+      const nextSettings = {
+        companyName: updated.companyName || settings.companyName,
+        legalName: updated.legalName || '',
+        taxOffice: updated.taxOffice || '',
+        taxNumber: updated.taxNumber || '',
+        address: updated.address || '',
+        phone: updated.phone || '',
+        email: updated.email || '',
+        website: updated.website || '',
+        logo: updated.logo || settings.logo,
+      };
+
+      setSettings(nextSettings);
+
       if (typeof window !== 'undefined') {
-        localStorage.setItem('companySettings', JSON.stringify(settings));
+        localStorage.setItem('companySettings', JSON.stringify(nextSettings));
       }
-      
-      alert('Firma ayarları kaydedildi!');
+
+      alert(
+        updated.savedLocally
+          ? 'Firma ayarları bu cihaza kaydedildi. Tüm cihazlarda görünmesi için Railway backend yeniden deploy edilmeli.'
+          : 'Firma ayarları kaydedildi!'
+      );
     } catch (error: any) {
       console.error('Kaydetme hatası:', error);
       alert(error.message || 'Ayarlar kaydedilirken bir hata oluştu.');
@@ -364,7 +381,7 @@ export default function CompanySettings() {
                 {settings.logo ? (
                   <>
                     <Avatar
-                      src={settings.logo}
+                      src={resolveLogoUrl(settings.logo)}
                       variant="square"
                       sx={{
                         width: '100%',

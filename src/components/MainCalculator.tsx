@@ -59,7 +59,8 @@ export default function MainCalculator() {
     setProductionCount, 
     calculateTotalWeight,
     addToHistory,
-    removeFromHistory
+    removeFromHistory,
+    clearHistory
   } = useStore();
 
   // Görsel ve hesaplama sonucu gösterimi için durum
@@ -130,6 +131,19 @@ export default function MainCalculator() {
   const handleRemoveFromHistory = (id: string) => {
     removeFromHistory(id);
     toast.success("Kayıt silindi!");
+  };
+
+  // Geçmişin tamamını temizleme
+  const handleClearHistory = () => {
+    if (calculationHistory.length === 0) {
+      toast.error("Temizlenecek hesaplama bulunmuyor!");
+      return;
+    }
+    if (!window.confirm("Tüm hesaplama geçmişini temizlemek istediğinize emin misiniz?")) {
+      return;
+    }
+    clearHistory();
+    toast.success("Hesaplama geçmişi temizlendi!");
   };
 
   // Geçmiş listesinin tamamını yazdır
@@ -584,17 +598,39 @@ export default function MainCalculator() {
               flexDirection: 'column'
             }}>
               <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column' }}>
-                <Typography 
-                  variant="subtitle1" 
-                  sx={{ 
-                    mb: 2.5, 
-                    fontWeight: 600,
-                    color: '#1F2937',
-                    fontSize: '16px'
-                  }}
-                >
-                  Hesaplama Geçmişi
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, gap: 1 }}>
+                  <Typography 
+                    variant="subtitle1" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#1F2937',
+                      fontSize: '16px'
+                    }}
+                  >
+                    Hesaplama Geçmişi
+                  </Typography>
+                  {calculationHistory.length > 0 && (
+                    <Button
+                      size="small"
+                      onClick={handleClearHistory}
+                      startIcon={<DeleteIcon fontSize="small" />}
+                      sx={{
+                        color: '#EF4444',
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: '0.8125rem',
+                        borderRadius: '8px',
+                        px: 1,
+                        minWidth: 'auto',
+                        '&:hover': {
+                          bgcolor: '#FEE2E2'
+                        }
+                      }}
+                    >
+                      Temizle
+                    </Button>
+                  )}
+                </Box>
                 
                 {calculationHistory.length > 0 ? (
                   <>
