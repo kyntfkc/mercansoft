@@ -23,7 +23,11 @@ import {
   List,
   ListItem,
   ListItemText,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { useStore } from '../store/useStore';
 import { matchesAnySearch } from '../lib/search';
@@ -72,6 +76,7 @@ export default function MainCalculator() {
   // Seçilen model için yerel durum
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [metalFilter, setMetalFilter] = useState<MetalTypeFilter>('all');
+  const [clearHistoryDialogOpen, setClearHistoryDialogOpen] = useState(false);
 
   const filteredModels = models.filter((model) => matchesMetalTypeFilter(model.metalType, metalFilter));
 
@@ -133,16 +138,18 @@ export default function MainCalculator() {
     toast.success("Kayıt silindi!");
   };
 
-  // Geçmişin tamamını temizleme
-  const handleClearHistory = () => {
+  // Geçmiş temizleme onay diyaloğu
+  const handleOpenClearHistoryDialog = () => {
     if (calculationHistory.length === 0) {
       toast.error("Temizlenecek hesaplama bulunmuyor!");
       return;
     }
-    if (!window.confirm("Tüm hesaplama geçmişini temizlemek istediğinize emin misiniz?")) {
-      return;
-    }
+    setClearHistoryDialogOpen(true);
+  };
+
+  const handleConfirmClearHistory = () => {
     clearHistory();
+    setClearHistoryDialogOpen(false);
     toast.success("Hesaplama geçmişi temizlendi!");
   };
 
@@ -612,7 +619,7 @@ export default function MainCalculator() {
                   {calculationHistory.length > 0 && (
                     <Button
                       size="small"
-                      onClick={handleClearHistory}
+                      onClick={handleOpenClearHistoryDialog}
                       startIcon={<DeleteIcon fontSize="small" />}
                       sx={{
                         color: '#EF4444',
@@ -894,6 +901,41 @@ export default function MainCalculator() {
           )}
         </>
       )}
+
+      <Dialog
+        open={clearHistoryDialogOpen}
+        onClose={() => setClearHistoryDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600, color: '#1F2937' }}>
+          Geçmişi Temizle
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: '#4B5563', fontSize: '0.9375rem' }}>
+            Tüm hesaplama geçmişini temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setClearHistoryDialogOpen(false)}
+            sx={{ textTransform: 'none', color: '#6B7280' }}
+          >
+            İptal
+          </Button>
+          <Button
+            onClick={handleConfirmClearHistory}
+            variant="contained"
+            sx={{
+              textTransform: 'none',
+              bgcolor: '#EF4444',
+              '&:hover': { bgcolor: '#DC2626' }
+            }}
+          >
+            Temizle
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 } 
