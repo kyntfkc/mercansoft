@@ -12,7 +12,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { authAPI } from '../../lib/api';
-import { DEFAULT_LOGO, getCachedCompanyLogo } from '../../lib/logo';
+import { DEFAULT_LOGO, getCachedCompanyLogo, removeLogoWhiteBackground } from '../../lib/logo';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function LoginPage() {
@@ -33,7 +33,11 @@ export default function LoginPage() {
   // Daha önce kaydedildiyse (Firma Ayarları) giriş ekranında da logo göster
   useEffect(() => {
     const cached = getCachedCompanyLogo();
-    setCompanyLogo(cached || DEFAULT_LOGO);
+    if (!cached) {
+      setCompanyLogo(DEFAULT_LOGO);
+      return;
+    }
+    removeLogoWhiteBackground(cached).then(setCompanyLogo);
   }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

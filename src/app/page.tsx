@@ -45,7 +45,7 @@ import { useRouter } from 'next/navigation';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import { companySettingsAPI } from '../lib/api';
-import { DEFAULT_LOGO, resolveLogoUrl, getCachedCompanyLogo, cacheCompanyLogo } from '../lib/logo';
+import { DEFAULT_LOGO, resolveLogoUrl, getCachedCompanyLogo, cacheCompanyLogo, removeLogoWhiteBackground } from '../lib/logo';
 
 // Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
 const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
@@ -111,9 +111,13 @@ function HomeContent() {
     setIsMounted(true);
     const cached = getCachedCompanyLogo();
     if (cached) {
-      setCompanyLogo(cached);
+      removeLogoWhiteBackground(cached).then((clean) => {
+        setCompanyLogo(clean);
+        setLogoReady(true);
+      });
+    } else {
+      setLogoReady(true);
     }
-    setLogoReady(true);
   }, []);
 
   useEffect(() => {
@@ -135,7 +139,9 @@ function HomeContent() {
 
         if (settings.logo && settings.logo.trim() !== '') {
           const url = resolveLogoUrl(settings.logo);
-          setCompanyLogo(url);
+          const clean = await removeLogoWhiteBackground(url);
+          if (cancelled) return;
+          setCompanyLogo(clean);
           cacheCompanyLogo(settings.logo);
           return;
         }
@@ -147,7 +153,12 @@ function HomeContent() {
         if (cancelled) return;
 
         const cached = getCachedCompanyLogo();
-        setCompanyLogo(cached || DEFAULT_LOGO);
+        if (cached) {
+          const clean = await removeLogoWhiteBackground(cached);
+          if (!cancelled) setCompanyLogo(clean);
+        } else {
+          setCompanyLogo(DEFAULT_LOGO);
+        }
       }
     };
 
@@ -240,24 +251,8 @@ function HomeContent() {
           </Button>
         </Box>
       <Zoom in={showContent} timeout={600}>
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Paper 
-            elevation={3} 
-            sx={{ 
-              px: 3,
-              py: 2.75,
-              borderRadius: 3, 
-              mb: 3, 
-              textAlign: 'center',
-              background: 'linear-gradient(135deg, #1B4F63 0%, #225C73 45%, #5E8A9A 100%)',
-              color: 'white',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 8px 28px rgba(34, 92, 115, 0.35)',
-              maxWidth: '440px',
-              width: '100%'
-            }}
-          >
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 440 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, minHeight: 88 }}>
               {companyLogo && (
                 <Box
@@ -277,16 +272,14 @@ function HomeContent() {
                     }
                   }}
                   sx={{
-                    height: 88,
-                    maxWidth: 280,
+                    height: 96,
+                    maxWidth: 300,
                     width: 'auto',
                     objectFit: 'contain',
                     display: 'block',
-                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))',
                   }}
                 />
               )}
-              {/* Logo yüklenemezse fallback göster */}
               <Box
                 className="logo-fallback"
                 sx={{
@@ -295,12 +288,8 @@ function HomeContent() {
                   gap: 1
                 }}
               >
-                <DiamondIcon sx={{ 
-                  fontSize: 36, 
-                  color: 'white', 
-                  filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.5))'
-                }} />
-                <Typography variant="h4" component="h1" fontWeight="bold">
+                <DiamondIcon sx={{ fontSize: 36, color: '#225C73' }} />
+                <Typography variant="h4" component="h1" fontWeight="bold" color="#225C73">
                   MercanSoft
                 </Typography>
               </Box>
@@ -308,7 +297,7 @@ function HomeContent() {
             <Typography
               variant="body1"
               sx={{
-                opacity: 0.95,
+                color: '#4B5563',
                 fontWeight: 500,
                 letterSpacing: '0.02em',
                 fontSize: '0.95rem',
@@ -316,7 +305,7 @@ function HomeContent() {
             >
               Gelişmiş Taş Hesaplama Sistemi
             </Typography>
-          </Paper>
+          </Box>
         </Box>
       </Zoom>
 
