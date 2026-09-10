@@ -83,14 +83,13 @@ export default function LoginPage() {
               src={companyLogo}
               alt="Firma Logosu"
               sx={{
-                height: 88,
-                maxWidth: 280,
+                height: 120,
+                maxWidth: 360,
                 width: 'auto',
                 objectFit: 'contain',
                 display: 'block',
                 mx: 'auto',
                 mb: 2,
-                filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))',
               }}
               onError={() => setCompanyLogo(DEFAULT_LOGO)}
             />

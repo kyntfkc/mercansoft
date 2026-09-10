@@ -252,8 +252,8 @@ function HomeContent() {
         </Box>
       <Zoom in={showContent} timeout={600}>
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 440 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, minHeight: 88 }}>
+          <Box sx={{ textAlign: 'center', width: '100%', maxWidth: 520 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, minHeight: 140 }}>
               {companyLogo && (
                 <Box
                   component="img"
@@ -272,8 +272,8 @@ function HomeContent() {
                     }
                   }}
                   sx={{
-                    height: 96,
-                    maxWidth: 300,
+                    height: 140,
+                    maxWidth: 420,
                     width: 'auto',
                     objectFit: 'contain',
                     display: 'block',
@@ -288,8 +288,8 @@ function HomeContent() {
                   gap: 1
                 }}
               >
-                <DiamondIcon sx={{ fontSize: 36, color: '#225C73' }} />
-                <Typography variant="h4" component="h1" fontWeight="bold" color="#225C73">
+                <DiamondIcon sx={{ fontSize: 48, color: '#225C73' }} />
+                <Typography variant="h3" component="h1" fontWeight="bold" color="#225C73">
                   MercanSoft
                 </Typography>
               </Box>
