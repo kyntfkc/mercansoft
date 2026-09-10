@@ -347,16 +347,19 @@ export default function MainCalculator() {
       </Card>
         </Box>
 
-      {showResults && (
-        <>
-          <Box sx={{ 
+      <Box sx={{ 
             width: '100%',
             display: { xs: 'flex', lg: 'grid' },
             flexDirection: { xs: 'column', lg: 'unset' },
-            gridTemplateColumns: { lg: '1.3fr 1fr 1fr' },
+            gridTemplateColumns: { 
+              lg: showResults ? '1.3fr 1fr 1fr' : 'minmax(280px, 360px)' 
+            },
+            justifyContent: { lg: showResults ? 'normal' : 'end' },
             gap: 3,
             mb: 2.5
           }}>
+            {showResults && (
+              <>
             {/* Model Görseli Kartı */}
             <Card sx={{ 
               height: 'fit-content',
@@ -593,8 +596,10 @@ export default function MainCalculator() {
                 </Box>
               </Card>
             )}
+              </>
+            )}
             
-            {/* Hesaplama Geçmişi - Sağ Sidebar */}
+            {/* Hesaplama Geçmişi - Sağ Sidebar (her zaman açık) */}
             <Card sx={{ 
               height: 'fit-content',
               borderRadius: '16px',
@@ -602,7 +607,8 @@ export default function MainCalculator() {
               border: '1px solid #e5e7eb',
               bgcolor: '#ffffff',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              width: '100%'
             }}>
               <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, gap: 1 }}>
@@ -793,7 +799,7 @@ export default function MainCalculator() {
           </Box>
 
           {/* Taş Listesi - Ayrı Kart */}
-          {calculationResult && calculationResult.stoneDetails.length > 0 && (
+          {showResults && calculationResult && calculationResult.stoneDetails.length > 0 && (
             <Card sx={{ 
               width: '100%', 
               mt: 3, 
@@ -899,8 +905,6 @@ export default function MainCalculator() {
               </CardContent>
             </Card>
           )}
-        </>
-      )}
 
       <Dialog
         open={clearHistoryDialogOpen}
