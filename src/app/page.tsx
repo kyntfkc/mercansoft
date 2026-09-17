@@ -54,7 +54,7 @@ const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVe
 function TabContent({ active, children }: { active: boolean, children: React.ReactNode }) {
   return (
     <Fade in={active} timeout={450}>
-      <Box sx={{ p: 2, display: active ? 'block' : 'none' }}>
+      <Box sx={{ p: { xs: 1, sm: 1.25 }, display: active ? 'block' : 'none' }}>
         {children}
       </Box>
     </Fade>
@@ -214,26 +214,20 @@ function HomeContent() {
   }
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh', bgcolor: '#f7f8fa', transform: 'scale(0.9)', transformOrigin: 'top center' }}>
-      <Container maxWidth="xl" sx={{ py: 2.7, px: { xs: 1.8, md: 2.7 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2, gap: 1.5 }}>
-          <Typography variant="body1" fontWeight={600} color="text.primary">
-            {user ? `Hoş geldin, ${user.username}` : 'Hoş geldiniz'}
-          </Typography>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            startIcon={<LogoutIcon fontSize="small" />}
-            onClick={handleLogout}
+    <Box sx={{ width: '100%', minHeight: '100vh', bgcolor: '#f7f8fa' }}>
+      <Container maxWidth="xl" sx={{ py: 1.5, px: { xs: 1.5, md: 2 } }}>
+        <Zoom in={showContent} timeout={600}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              mb: 1.5,
+              flexWrap: 'wrap',
+            }}
           >
-            Çıkış Yap
-          </Button>
-        </Box>
-      <Zoom in={showContent} timeout={600}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
-          <Box sx={{ textAlign: 'center', width: '100%' }}>
-            <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
               {companyLogo && (
                 <Box
                   component="img"
@@ -259,7 +253,7 @@ function HomeContent() {
                 sx={{
                   display: companyLogo || !logoReady ? 'none' : 'flex',
                   alignItems: 'center',
-                  gap: 1
+                  gap: 1,
                 }}
               >
                 <DiamondIcon sx={{ fontSize: 28, color: '#225C73' }} />
@@ -267,25 +261,39 @@ function HomeContent() {
                   MercanSoft
                 </Typography>
               </Box>
+              <Typography
+                sx={{
+                  display: { xs: 'none', sm: 'block' },
+                  color: '#64748B',
+                  fontSize: '0.8125rem',
+                  lineHeight: 1.3,
+                  borderLeft: '1px solid #e2e8f0',
+                  pl: 1.5,
+                }}
+              >
+                Gelişmiş Taş Hesaplama Sistemi
+              </Typography>
             </Box>
-            <Typography
-              sx={{
-                mt: 0.5,
-                mx: 'auto',
-                maxWidth: 560,
-                color: '#64748B',
-                fontSize: '0.875rem',
-                lineHeight: 1.5,
-              }}
-            >
-              Gelişmiş Taş Hesaplama Sistemi
-            </Typography>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, ml: 'auto' }}>
+              <Typography variant="body2" fontWeight={600} color="text.primary" noWrap>
+                {user ? `Hoş geldin, ${user.username}` : 'Hoş geldiniz'}
+              </Typography>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                startIcon={<LogoutIcon fontSize="small" />}
+                onClick={handleLogout}
+              >
+                Çıkış Yap
+              </Button>
+            </Box>
           </Box>
-        </Box>
-      </Zoom>
+        </Zoom>
 
       <Zoom in={showContent} timeout={900}>
-        <Card elevation={3} sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+        <Card elevation={3} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
           {/* Özel Tab Başlıkları */}
           <Box sx={{ 
             display: 'flex', 
@@ -315,7 +323,7 @@ function HomeContent() {
                 sx={{
                   flex: 1,
                   borderRadius: 0,
-                  py: 1.5,
+                  py: 1.25,
                   textTransform: 'none',
                   fontSize: '0.9rem',
                   fontWeight: activeTab === index ? 600 : 500,

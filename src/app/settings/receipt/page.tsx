@@ -42,9 +42,10 @@ import {
   defaultReceiptSettings,
   mergeReceiptSettings,
   openPrintWindow,
+  METAL_PRINT_LABELS,
   ReceiptSettings as ReceiptSettingsType,
 } from '@/lib/receipt';
-import { resolveLogoUrl } from '@/lib/logo';
+import { DEFAULT_LOGO, prepareThermalPrintLogo, resolveLogoUrl } from '@/lib/logo';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: '100%',
@@ -111,13 +112,6 @@ const formatDate = (date: Date): string => {
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
   return `${day}.${month}.${year}`;
-};
-
-// Bölge ayarlarına bağlı olmayan saat formatı
-const formatTime = (date: Date): string => {
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
 };
 
 export default function ReceiptSettings() {
@@ -197,21 +191,20 @@ export default function ReceiptSettings() {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     try {
+      const cleanedLogo = await prepareThermalPrintLogo(
+        resolveLogoUrl(companyLogo || DEFAULT_LOGO),
+        160
+      );
       const html = buildReceiptHtml(
         settings,
         {
-          modelName: settings.modelName?.trim() || 'Örnek Model',
-          productionCount: 2,
           totalWeight: 1.5,
-          stoneDetails: [
-            { stoneName: 'Zirkon 1.5mm', quantity: 24, totalWeight: 0.96 },
-            { stoneName: 'Baget 2mm', quantity: 8, totalWeight: 0.54 },
-          ],
+          metalLabel: METAL_PRINT_LABELS.altın,
           printedAt: new Date(),
         },
-        companyLogo
+        cleanedLogo
       );
       openPrintWindow(html);
     } catch (error: any) {
@@ -227,216 +220,71 @@ export default function ReceiptSettings() {
   };
 
   const ReceiptPreview = () => {
-    const previewData = {
-      total: { quantity: 2, weight: 1.5 },
-      stones: [
-        { stoneName: 'Zirkon 1.5mm', quantity: 24, totalWeight: 0.96 },
-        { stoneName: 'Baget 2mm', quantity: 8, totalWeight: 0.54 },
-      ],
-    };
     const now = new Date();
     const logoSrc = companyLogo ? resolveLogoUrl(companyLogo) : null;
+    const dateText = formatDate(now);
+    // 72mm termal önizleme (~272px @ 96dpi)
+    const previewWidth = 272;
 
     return (
-      <Paper 
-        sx={{ 
-          p: 1,
-          width: settings.width * 3.779527559,
-          height: 'auto',
-          minHeight: settings.minHeight * 3.779527559,
+      <Paper
+        elevation={0}
+        sx={{
+          width: previewWidth,
           mx: 'auto',
-          fontFamily: settings.fontFamily,
-          fontSize: settings.fontSize,
-          lineHeight: settings.lineHeight,
-          bgcolor: '#fbfbfb',
-          transition: 'none'
+          p: '6px 8px 8px',
+          bgcolor: '#fff',
+          border: '1px solid #ccc',
+          borderRadius: 0,
+          textAlign: 'center',
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          color: '#000',
+          lineHeight: 1.2,
         }}
       >
-        <Box 
-          sx={{ 
-            textAlign: settings.titleCenter ? 'center' : 'left',
-            border: '2px solid #ccdbe3',
-            borderRadius: '5px',
-            p: 1,
-            bgcolor: 'white',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
-            position: 'relative',
+        {logoSrc && (
+          <Box sx={{ mb: '4px', display: 'flex', justifyContent: 'center', lineHeight: 0 }}>
+            <Box
+              component="img"
+              src={logoSrc}
+              alt=""
+              sx={{
+                width: 'auto',
+                maxWidth: 210,
+                maxHeight: 52,
+                height: 'auto',
+                display: 'block',
+                objectFit: 'contain',
+              }}
+            />
+          </Box>
+        )}
+
+        <Typography sx={{ fontSize: 14, fontWeight: 800, mb: '4px', color: '#000' }}>
+          {dateText}
+        </Typography>
+
+        <Box sx={{ borderTop: '1px solid #000', mb: '6px' }} />
+
+        <Box
+          sx={{
+            border: '2px solid #000',
+            p: '6px 4px',
+            mb: '6px',
+            fontSize: 13,
+            fontWeight: 800,
           }}
         >
-          {settings.showLogo && logoSrc && (
-            <Box sx={{ mb: 1, display: 'flex', justifyContent: 'center' }}>
-              <Box
-                component="img"
-                src={logoSrc}
-                alt="Logo"
-                sx={{
-                  height: Math.max(24, Math.round((settings.logoSize / 100) * 48)),
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                }}
-              />
-            </Box>
-          )}
+          {METAL_PRINT_LABELS.altın}
+        </Box>
 
-          {settings.showTitle && (
-            <Typography 
-              sx={{
-                textAlign: settings.titleCenter ? 'center' : 'left',
-                mb: 0.5,
-                fontSize: settings.titleSize,
-                color: settings.titleColor || '#225C73',
-                borderBottom: '1px dashed #dde9ef',
-                pb: 0.5,
-                fontWeight: settings.titleBold ? 'bold' : 'normal'
-              }}
-            >
-              {settings.title}
-            </Typography>
-          )}
-
-          {(settings.showDate || settings.showTime) && (
-            <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#666', mb: 0.75 }}>
-              {settings.showDate ? formatDate(now) : ''}
-              {settings.showDate && settings.showTime ? ' ' : ''}
-              {settings.showTime ? formatTime(now) : ''}
-            </Typography>
-          )}
-          
-          {settings.showModel && (
-            <Typography
-              sx={{
-                fontSize: settings.fontSize + 1,
-                my: 0.75,
-                bgcolor: '#f3f8fb',
-                p: 0.5,
-                borderRadius: '3px',
-                border: '1px solid #e0ebf2'
-              }}
-            >
-              {settings.modelName?.trim() || 'Örnek Model'}
-            </Typography>
-          )}
-          
-          <Box 
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              my: 0.75,
-              p: 0.5,
-              borderRadius: '3px',
-              bgcolor: '#f8fbfc',
-              gap: 0.5
-            }}
-          >
-            {settings.showQuantity && (
-            <Box 
-              sx={{
-                textAlign: 'center',
-                flex: 1,
-                p: 0.5,
-                borderRadius: '3px'
-              }}
-            >
-              <Typography 
-                sx={{
-                  fontSize: settings.fontSize + 4,
-                  fontWeight: 'bold',
-                  mb: 0.25,
-                  color: '#225C73'
-                }}
-              >
-                {previewData.total.quantity}
-              </Typography>
-              <Typography 
-                sx={{
-                  fontSize: settings.fontSize - 3,
-                  color: '#666',
-                  textTransform: 'uppercase'
-                }}
-              >
-                ADET
-              </Typography>
-            </Box>
-            )}
-            
-            <Box 
-              sx={{
-                textAlign: 'center',
-                flex: 1,
-                p: 0.5,
-                borderRadius: '3px'
-              }}
-            >
-              <Typography 
-                sx={{
-                  fontSize: settings.fontSize + 4,
-                  fontWeight: 'bold',
-                  mb: 0.25,
-                  color: '#225C73'
-                }}
-              >
-                {previewData.total.weight}
-              </Typography>
-              <Typography 
-                sx={{
-                  fontSize: settings.fontSize - 3,
-                  color: '#666',
-                  textTransform: 'uppercase'
-                }}
-              >
-                TAŞ GRAMI
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ mt: 1, pt: 0.75, borderTop: '1px dotted #dde9ef', textAlign: 'left' }}>
-            <Typography
-              sx={{
-                fontSize: Math.max(8, settings.fontSize - 1),
-                fontWeight: settings.tableHeaderBold ? 'bold' : 'normal',
-                color: '#666',
-                textTransform: 'uppercase',
-                mb: 0.5,
-              }}
-            >
-              Taş Detayları
-            </Typography>
-            {previewData.stones.map((stone) => (
-              <Box
-                key={stone.stoneName}
-                sx={{
-                  py: 0.4,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  gap: 1,
-                }}
-              >
-                <Typography sx={{ fontSize: settings.fontSize, fontWeight: 500, flex: 1 }}>
-                  {stone.stoneName} x {stone.quantity} Adet
-                </Typography>
-                <Typography sx={{ fontSize: Math.max(8, settings.fontSize - 1), color: '#555', flexShrink: 0 }}>
-                  {stone.totalWeight.toFixed(3)} gr
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-          
-          {settings.showFooter && (
-            <Typography 
-              sx={{ 
-                mt: 0.75,
-                fontSize: settings.footerFontSize,
-                color: '#225C73',
-                textAlign: 'center',
-                borderTop: '1px dashed #dde9ef',
-                pt: 0.5,
-                fontWeight: 500
-              }}
-            >
-              {settings.footerText}
-            </Typography>
-          )}
+        <Box sx={{ border: '2px solid #000', p: '6px 4px' }}>
+          <Typography sx={{ display: 'block', fontSize: 10, fontWeight: 700, mb: '2px', color: '#000' }}>
+            Toplam Taş Gramı
+          </Typography>
+          <Typography sx={{ display: 'block', fontSize: 17, fontWeight: 900, color: '#000' }}>
+            1.50 gr
+          </Typography>
         </Box>
       </Paper>
     );

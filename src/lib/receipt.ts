@@ -40,27 +40,18 @@ export interface ReceiptSettings {
   footerFontSize: number;
 }
 
-export interface ReceiptStoneDetail {
-  stoneName: string;
-  quantity: number;
-  totalWeight: number;
-}
-
-export interface ReceiptPrintItem {
-  modelName: string;
-  productionCount: number;
-  totalWeight: number;
-  stoneDetails?: ReceiptStoneDetail[];
-}
-
 export interface ReceiptPrintData {
-  modelName?: string;
-  productionCount?: number;
   totalWeight?: number;
-  stoneDetails?: ReceiptStoneDetail[];
-  items?: ReceiptPrintItem[];
+  metalLabel?: string;
   printedAt?: Date;
 }
+
+export const METAL_PRINT_LABELS = {
+  altın: '14 Ayar Yeşil',
+  gümüş: '925 ayar Gümüş',
+} as const;
+
+export type PrintMetalType = keyof typeof METAL_PRINT_LABELS;
 
 export const defaultReceiptSettings = (): ReceiptSettings => ({
   showTitle: true,
@@ -87,9 +78,9 @@ export const defaultReceiptSettings = (): ReceiptSettings => ({
   columnSpacing: 8,
   headerBgColor: '#f5f5f5',
   borderColor: '#e0e0e0',
-  margins: { top: 5, right: 5, bottom: 5, left: 5 },
-  width: 80,
-  minHeight: 120,
+  margins: { top: 2, right: 2, bottom: 2, left: 2 },
+  width: 72,
+  minHeight: 60,
   showFooter: true,
   footerText: 'Teşekkür ederiz.',
   footerFontSize: 10,
@@ -100,12 +91,6 @@ const formatDate = (date: Date): string => {
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
   return `${day}.${month}.${year}`;
-};
-
-const formatTime = (date: Date): string => {
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
 };
 
 const escapeHtml = (value: string): string =>
@@ -126,275 +111,205 @@ export function mergeReceiptSettings(partial?: Partial<ReceiptSettings> | null):
   };
 }
 
+/**
+ * Termal fiş (80mm rulo / ~72mm baskı alanı).
+ * Tek sütun, sabit siyah mürekkep, sıkı dikey boşluk — dekoratif ayarlar yok sayılır.
+ */
 export function buildReceiptHtml(
-  settings: ReceiptSettings,
+  _settings: ReceiptSettings,
   data: ReceiptPrintData,
   logoUrl?: string | null
 ): string {
   const printedAt = data.printedAt ?? new Date();
-  const items: ReceiptPrintItem[] =
-    data.items && data.items.length > 0
-      ? data.items
-      : [
-          {
-            modelName: settings.modelName?.trim() || data.modelName || '',
-            productionCount: Number(data.productionCount || 0),
-            totalWeight: Number(data.totalWeight || 0),
-            stoneDetails: data.stoneDetails || [],
-          },
-        ];
-  const totalWeight = items.reduce((sum, item) => sum + Number(item.totalWeight || 0), 0);
-  const title = escapeHtml(settings.title || '');
-  const footerText = escapeHtml(settings.footerText || '');
-  const resolvedLogo = logoUrl ? resolveLogoUrl(logoUrl) : null;
-  const logoHeight = Math.max(24, Math.round((settings.logoSize / 100) * 48));
-  const datePart = settings.showDate ? formatDate(printedAt) : '';
-  const timePart = settings.showTime ? formatTime(printedAt) : '';
-  const metaText = [datePart, timePart].filter(Boolean).join(' ');
-  const multi = items.length > 1;
-
-  const renderStoneDetails = (stoneDetails?: ReceiptStoneDetail[]) => {
-    if (!stoneDetails || stoneDetails.length === 0) return '';
-    const rows = stoneDetails
-      .map((stone) => {
-        const name = escapeHtml(stone.stoneName || 'Bilinmeyen Taş');
-        const qty = Number(stone.quantity || 0);
-        const weight = Number(stone.totalWeight || 0).toFixed(3);
-        return `<div class="stone-row">
-          <div class="stone-name">${name} x ${qty} Adet</div>
-          <div class="stone-weight">${weight} gr</div>
-        </div>`;
-      })
-      .join('');
-    return `<div class="stones">
-      <div class="stones-title">Taş Detayları</div>
-      ${rows}
-    </div>`;
-  };
-
-  const itemsHtml = items
-    .map((item) => {
-      const modelName = escapeHtml(item.modelName || '');
-      const qty = Number(item.productionCount || 0);
-      const weight = Number(item.totalWeight || 0).toFixed(2);
-      const stonesHtml = renderStoneDetails(item.stoneDetails);
-      if (multi) {
-        return `<div class="item">
-          ${settings.showModel ? `<div class="item-name">${modelName}</div>` : ''}
-          <div class="item-meta">
-            ${settings.showQuantity ? `<span>${qty} adet</span>` : ''}
-            <span>${weight} gr</span>
-          </div>
-          ${stonesHtml}
-        </div>`;
-      }
-      return `
-      ${settings.showModel ? `<div class="model">${modelName}</div>` : ''}
-      <div class="details">
-        ${settings.showQuantity ? `<div class="detail-item"><div class="detail-value">${qty}</div><div class="detail-label">Adet</div></div>` : ''}
-        <div class="detail-item"><div class="detail-value">${weight}</div><div class="detail-label">Taş Gramı</div></div>
-      </div>
-      ${stonesHtml}`;
-    })
-    .join('');
-
-  const totalHtml = multi
-    ? `<div class="total">
-        <div class="total-label">Toplam Taş Gramı</div>
-        <div class="total-value">${totalWeight.toFixed(2)} gr</div>
-      </div>`
-    : '';
+  const totalWeight = Number(data.totalWeight || 0).toFixed(2);
+  const metalLabel = data.metalLabel ? escapeHtml(data.metalLabel) : '';
+  let resolvedLogo = logoUrl ? resolveLogoUrl(logoUrl) : null;
+  if (resolvedLogo && resolvedLogo.startsWith('/') && typeof window !== 'undefined') {
+    resolvedLogo = `${window.location.origin}${resolvedLogo}`;
+  }
+  const dateText = formatDate(printedAt);
+  const w = 72;
 
   return `<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Fiş Yazdır</title>
-    <style>
-      @page {
-        size: ${settings.width}mm auto;
-        margin: 0;
+<head>
+  <meta charset="utf-8">
+  <title>Fiş</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: ${w}mm;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      line-height: 1.2;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    @page {
+      size: ${w}mm auto;
+      margin: 0;
+    }
+    @media print {
+      html, body {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
-      body {
-        margin: 0;
-        padding: 0;
-        width: ${settings.width}mm;
-        min-height: ${settings.minHeight}mm;
-        font-family: ${settings.fontFamily};
-        color: ${settings.textColor};
-        box-sizing: border-box;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .receipt {
-        padding: ${settings.margins.top}mm ${settings.margins.right}mm ${settings.margins.bottom}mm ${settings.margins.left}mm;
-        min-height: ${Math.max(40, settings.minHeight - settings.margins.top - settings.margins.bottom)}mm;
-        display: flex;
-        flex-direction: column;
-        text-align: ${settings.titleCenter ? 'center' : 'left'};
-        box-sizing: border-box;
-      }
-      .logo {
-        margin-bottom: 4mm;
-      }
-      .logo img {
-        max-width: 100%;
-        height: ${logoHeight}px;
-        object-fit: contain;
-      }
-      .header {
-        margin-bottom: 4mm;
-        border-bottom: 1px dashed ${settings.borderColor};
-        padding-bottom: 2mm;
-        font-size: ${settings.titleSize}px;
-        font-weight: ${settings.titleBold ? 'bold' : 'normal'};
-        color: ${settings.titleColor};
-      }
-      .meta {
-        font-size: ${Math.max(8, settings.fontSize - 1)}px;
-        color: #666;
-        margin-bottom: 3mm;
-      }
-      .model {
-        font-size: ${settings.fontSize + 2}px;
-        padding: 3mm 0;
-        background-color: ${settings.headerBgColor};
-        margin: 3mm 0;
-        border-radius: 3px;
-      }
-      .items {
-        text-align: left;
-        margin: 2mm 0;
-      }
-      .item {
-        padding: 2.5mm 0;
-        border-bottom: 1px dashed ${settings.borderColor};
-      }
-      .item:last-child {
-        border-bottom: none;
-      }
-      .item-name {
-        font-size: ${settings.fontSize + 1}px;
-        font-weight: ${settings.tableHeaderBold ? 'bold' : 'normal'};
-        margin-bottom: 1mm;
-        word-break: break-word;
-      }
-      .item-meta {
-        display: flex;
-        justify-content: space-between;
-        gap: ${settings.columnSpacing}px;
-        font-size: ${settings.fontSize}px;
-        color: #444;
-      }
-      .stones {
-        margin-top: 2mm;
-        padding-top: 1.5mm;
-        border-top: 1px dotted ${settings.borderColor};
-        text-align: left;
-      }
-      .stones-title {
-        font-size: ${Math.max(8, settings.fontSize - 1)}px;
-        font-weight: ${settings.tableHeaderBold ? 'bold' : 'normal'};
-        color: #666;
-        text-transform: uppercase;
-        margin-bottom: 1.5mm;
-      }
-      .stone-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: ${settings.columnSpacing}px;
-        padding: 1.2mm 0;
-      }
-      .stone-name {
-        flex: 1;
-        font-size: ${settings.fontSize}px;
-        font-weight: 500;
-        word-break: break-word;
-      }
-      .stone-weight {
-        flex-shrink: 0;
-        font-size: ${Math.max(8, settings.fontSize - 1)}px;
-        color: #555;
-      }
-      .details {
-        display: flex;
-        justify-content: space-between;
-        gap: ${settings.columnSpacing}px;
-        padding: 3mm 0;
-      }
-      .detail-item {
-        flex: 1;
-        text-align: center;
-      }
-      .detail-value {
-        font-size: ${settings.fontSize + 4}px;
-        font-weight: bold;
-        color: ${settings.titleColor};
-      }
-      .detail-label {
-        font-size: ${Math.max(8, settings.fontSize - 2)}px;
-        color: #666;
-        text-transform: uppercase;
-      }
-      .total {
-        margin-top: 3mm;
-        padding: 3mm;
-        background-color: ${settings.headerBgColor};
-        border-radius: 3px;
-        text-align: center;
-      }
-      .total-label {
-        font-size: ${Math.max(8, settings.fontSize - 1)}px;
-        color: #666;
-        text-transform: uppercase;
-        margin-bottom: 1mm;
-      }
-      .total-value {
-        font-size: ${settings.fontSize + 4}px;
-        font-weight: bold;
-        color: ${settings.titleColor};
-      }
-      .footer {
-        margin-top: auto;
-        font-size: ${settings.footerFontSize}px;
-        padding-top: 3mm;
-        border-top: 1px dashed ${settings.borderColor};
-      }
-    </style>
-  </head>
-  <body>
-    <div class="receipt">
-      ${settings.showLogo && resolvedLogo ? `<div class="logo"><img src="${resolvedLogo}" alt="Logo" /></div>` : ''}
-      ${settings.showTitle ? `<div class="header">${title}</div>` : ''}
-      ${metaText ? `<div class="meta">${metaText}</div>` : ''}
-      ${multi ? `<div class="items">${itemsHtml}</div>` : itemsHtml}
-      ${totalHtml}
-      ${settings.showFooter ? `<div class="footer">${footerText}</div>` : ''}
+      @page { margin: 0 !important; }
+    }
+    .r {
+      width: 100%;
+      padding: 1mm 2mm 2mm;
+      text-align: center;
+    }
+    .logo {
+      margin: 0 0 1mm;
+      line-height: 0;
+    }
+    .logo img {
+      display: block;
+      margin: 0 auto;
+      width: auto;
+      max-width: 58mm;
+      max-height: 16mm;
+      height: auto;
+      image-rendering: crisp-edges;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .date {
+      margin: 0 0 1mm;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .sep {
+      border: 0;
+      border-top: 1px solid #000;
+      margin: 0 0 1.5mm;
+      height: 0;
+    }
+    .row {
+      width: 100%;
+      border: 2px solid #000;
+      padding: 1.5mm 1mm;
+      margin: 0 0 1.5mm;
+      text-align: center;
+    }
+    .row:last-child { margin-bottom: 0; }
+    .metal {
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .lbl {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      margin: 0 0 0.5mm;
+    }
+    .val {
+      display: block;
+      font-size: 17px;
+      font-weight: 900;
+    }
+  </style>
+</head>
+<body>
+  <div class="r">
+    ${resolvedLogo ? `<div class="logo"><img src="${resolvedLogo}" alt="" /></div>` : ''}
+    <div class="date">${dateText}</div>
+    <hr class="sep" />
+    ${metalLabel ? `<div class="row metal">${metalLabel}</div>` : ''}
+    <div class="row">
+      <span class="lbl">Toplam Taş Gramı</span>
+      <span class="val">${totalWeight} gr</span>
     </div>
-  </body>
+  </div>
+</body>
 </html>`;
 }
 
 export function openPrintWindow(html: string): void {
-  const printWindow = window.open('', '_blank', 'width=420,height=720');
+  // Firefox yazdırma paneli için geniş pencere; boyut vermezsek küçük popup açılır
+  const printWindow = window.open(
+    '',
+    '_blank',
+    'popup=yes,width=960,height=720,left=80,top=40,scrollbars=yes,resizable=yes'
+  );
   if (!printWindow) {
     throw new Error('Yazdırma penceresi açılamadı. Tarayıcı pop-up engelini kontrol edin.');
   }
 
+  // Yazdırma bitince / iptalde pencereyi kapat (Firefox dahil)
+  const htmlWithClose = html.replace(
+    '</body>',
+    `<script>
+(function () {
+  var closed = false;
+  function closeWin() {
+    if (closed) return;
+    closed = true;
+    setTimeout(function () {
+      try { window.close(); } catch (e) {}
+    }, 120);
+  }
+  window.addEventListener('afterprint', closeWin);
+  if (window.matchMedia) {
+    try {
+      var mql = window.matchMedia('print');
+      var onChange = function (e) {
+        if (!e.matches) closeWin();
+      };
+      if (mql.addEventListener) mql.addEventListener('change', onChange);
+      else if (mql.addListener) mql.addListener(onChange);
+    } catch (e) {}
+  }
+})();
+</script></body>`
+  );
+
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(htmlWithClose);
   printWindow.document.close();
 
+  let printed = false;
   const triggerPrint = () => {
+    if (printed) return;
+    printed = true;
     try {
       printWindow.focus();
       printWindow.print();
     } catch (error) {
       console.error('Yazdırma tetiklenemedi:', error);
+      try {
+        printWindow.close();
+      } catch (e) {}
     }
   };
 
-  printWindow.onload = triggerPrint;
-  setTimeout(triggerPrint, 400);
+  const images = Array.from(printWindow.document.images || []);
+  if (images.length === 0) {
+    setTimeout(triggerPrint, 200);
+    return;
+  }
+
+  let remaining = images.length;
+  const onImageDone = () => {
+    remaining -= 1;
+    if (remaining <= 0) setTimeout(triggerPrint, 250);
+  };
+
+  images.forEach((img) => {
+    if (img.complete && img.naturalWidth > 0) {
+      onImageDone();
+      return;
+    }
+    img.addEventListener('load', onImageDone, { once: true });
+    img.addEventListener('error', onImageDone, { once: true });
+  });
+
+  setTimeout(triggerPrint, 3000);
 }
