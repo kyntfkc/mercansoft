@@ -1,32 +1,21 @@
 'use client';
 
 import { useEffect, useState, useRef, KeyboardEvent } from 'react';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Card, 
-  CardContent, 
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Card,
+  CardContent,
   CardMedia,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   Autocomplete,
-  List,
-  ListItem,
-  ListItemText,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Collapse,
-  Chip
 } from '@mui/material';
 import { useStore } from '../store/useStore';
 import { matchesAnySearch } from '../lib/search';
@@ -35,7 +24,7 @@ import MetalTypeToggle from './MetalTypeToggle';
 import { companySettingsAPI, receiptSettingsAPI } from '../lib/api';
 import {
   buildReceiptHtml,
-  openPrintWindow,
+  printReceipt,
   METAL_PRINT_LABELS,
   PrintMetalType,
 } from '../lib/receipt';
@@ -43,11 +32,10 @@ import { DEFAULT_LOGO, prepareThermalPrintLogo, resolveLogoUrl } from '../lib/lo
 import PrintIcon from '@mui/icons-material/Print';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-hot-toast';
 
 const cardSx = {
-  height: 'auto',
+  height: '100%',
   alignSelf: 'stretch',
   borderRadius: '12px',
   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
@@ -58,28 +46,46 @@ const cardSx = {
 };
 
 const cardContentSx = {
-  p: 1.75,
-  '&:last-child': { pb: 1.75 },
-  display: 'flex',
-  flexDirection: 'column' as const,
-  flex: 1,
+              p: 1.75,
+              '&:last-child': { pb: 2 },
+              display: 'flex',
+              flexDirection: 'column' as const,
+              flex: 1,
+              minHeight: 0,
 };
 
 const sectionTitleSx = {
   fontWeight: 600,
   color: '#1F2937',
   fontSize: '0.875rem',
-  mb: 1.25,
+  mb: 1.5,
+  textAlign: 'center' as const,
 };
 
-const rowGridSx = {
+const threeColGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-  gap: 1.25,
-  alignItems: 'start',
+  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' },
+  gap: 1.5,
+  alignItems: 'stretch',
+  minHeight: { md: 560 },
 };
 
-// Model tipi tanımı
+const charcoalBtnSx = {
+  bgcolor: '#334155',
+  color: 'white',
+  borderRadius: '8px',
+  py: 0.85,
+  fontWeight: 600,
+  fontSize: '0.875rem',
+  textTransform: 'none' as const,
+  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+  '&:hover': { bgcolor: '#1E293B' },
+  '&.Mui-disabled': {
+    bgcolor: '#E5E7EB',
+    color: '#9CA3AF',
+  },
+};
+
 interface Model {
   id: string;
   name: string;
@@ -87,43 +93,34 @@ interface Model {
   category?: string;
   metalType?: 'altın' | 'gümüş';
   image?: string;
-  stones: Array<{stoneId: string; quantity: number}>;
+  stones: Array<{ stoneId: string; quantity: number }>;
 }
 
 export default function MainCalculator() {
-  const { 
-    models, 
-    selectedModelId, 
-    productionCount, 
+  const {
+    models,
+    selectedModelId,
     calculationResult,
     calculationHistory,
-    setSelectedModelId, 
-    setProductionCount, 
+    setSelectedModelId,
+    setProductionCount,
     calculateTotalWeight,
     addToHistory,
     removeFromHistory,
-    clearHistory
+    clearHistory,
   } = useStore();
 
-  // Görsel ve hesaplama sonucu gösterimi için durum
   const [showResults, setShowResults] = useState(false);
-  
-  // Üretim adedi için yerel durum
   const [localProductionCount, setLocalProductionCount] = useState<string>('');
-  
-  // Seçilen model için yerel durum
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
   const [metalFilter, setMetalFilter] = useState<MetalTypeFilter>('all');
   const [clearHistoryDialogOpen, setClearHistoryDialogOpen] = useState(false);
   const [printMetalDialogOpen, setPrintMetalDialogOpen] = useState(false);
-  const [stoneListOpen, setStoneListOpen] = useState(false);
   const pendingClearHistoryRef = useRef(false);
 
   const filteredModels = models.filter((model) => matchesMetalTypeFilter(model.metalType, metalFilter));
 
-  // Varsayılan olarak boş değerler (sadece mount'ta)
   useEffect(() => {
-    // İlk mount'ta sıfırla
     setSelectedModelId(null);
     setProductionCount(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,30 +131,28 @@ export default function MainCalculator() {
       setSelectedModel(null);
       setSelectedModelId(null);
       setShowResults(false);
-      setStoneListOpen(false);
     }
   }, [metalFilter, selectedModel, setSelectedModelId]);
 
-  // Seçili modelin resim URL'sini al
-  const selectedModelImage = models.find(m => m.id === selectedModelId)?.image;
+  const selectedModelImage = models.find((m) => m.id === selectedModelId)?.image;
 
-  // Tek taş ağırlığını hesaplama fonksiyonu
-  const calculateSingleStoneWeight = (countPerGram: number): number => {
-    if (countPerGram <= 0) return 0;
-    return 1 / countPerGram;
-  };
+  const canCalculate = Boolean(selectedModelId && localProductionCount);
+  const calculateHint = !selectedModelId
+    ? 'Önce model seçin'
+    : !localProductionCount
+      ? 'Üretim adedi girin'
+      : 'Hesaplamak için Enter tuşuna basın';
 
-  // Hesaplama butonuna tıklama olayı
+  const historyTotal = calculationHistory.reduce((sum, item) => sum + item.totalWeight, 0);
+
   const handleCalculate = () => {
     if (selectedModelId && localProductionCount) {
       setProductionCount(Number(localProductionCount));
       calculateTotalWeight();
       setShowResults(true);
-      setStoneListOpen(false);
     }
   };
-  
-  // Enter tuşuna basıldığında hesapla
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -165,26 +160,23 @@ export default function MainCalculator() {
     }
   };
 
-  // Hesaplamayı geçmişe ekleme
   const handleAddToHistory = () => {
     if (!calculationResult) {
-      toast.error("Lütfen önce hesaplama yapınız!");
+      toast.error('Lütfen önce hesaplama yapınız!');
       return;
     }
     addToHistory(calculationResult);
-    toast.success("Hesaplama geçmişe eklendi!");
+    toast.success('Hesaplama geçmişe eklendi!');
   };
 
-  // Geçmişten kayıt silme
   const handleRemoveFromHistory = (id: string) => {
     removeFromHistory(id);
-    toast.success("Kayıt silindi!");
+    toast.success('Kayıt silindi!');
   };
 
-  // Geçmiş temizleme onay diyaloğu
   const handleOpenClearHistoryDialog = () => {
     if (calculationHistory.length === 0) {
-      toast.error("Temizlenecek hesaplama bulunmuyor!");
+      toast.error('Temizlenecek hesaplama bulunmuyor!');
       return;
     }
     setClearHistoryDialogOpen(true);
@@ -199,12 +191,12 @@ export default function MainCalculator() {
     if (!pendingClearHistoryRef.current) return;
     pendingClearHistoryRef.current = false;
     clearHistory();
-    toast.success("Hesaplama geçmişi temizlendi!");
+    toast.success('Hesaplama geçmişi temizlendi!');
   };
 
   const handleOpenPrintMetalDialog = () => {
     if (calculationHistory.length === 0) {
-      toast.error("Yazdırılacak hesaplama bulunmuyor!");
+      toast.error('Yazdırılacak hesaplama bulunmuyor!');
       return;
     }
     setPrintMetalDialogOpen(true);
@@ -237,10 +229,19 @@ export default function MainCalculator() {
         cleanedLogo
       );
 
-      openPrintWindow(html);
+      const result = await printReceipt(html, {
+        width: settings.width,
+        minHeight: settings.minHeight,
+      });
+
+      if (result.silent) {
+        toast.success(result.message || 'Fiş yazıcıya gönderildi');
+      } else if (result.message) {
+        toast(result.message);
+      }
     } catch (error: any) {
-      console.error("Yazdırma hatası:", error);
-      toast.error(error?.message || "Yazdırma sırasında bir hata oluştu");
+      console.error('Yazdırma hatası:', error);
+      toast.error(error?.message || 'Yazdırma sırasında bir hata oluştu');
     }
   };
 
@@ -248,19 +249,15 @@ export default function MainCalculator() {
     <Box
       sx={{
         width: '100%',
-        maxWidth: 920,
-        mx: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1.25,
+        maxWidth: '100%',
       }}
     >
-      {/* Üst satır: Model Seçimi | Model Görseli */}
-      <Box sx={rowGridSx}>
-        <Card sx={cardSx}>
+      <Box sx={threeColGridSx}>
+        {/* Hesaplama — masaüstünde orta */}
+        <Card sx={{ ...cardSx, order: { xs: 2, md: 2 } }}>
           <CardContent sx={cardContentSx}>
             <Typography variant="subtitle1" sx={sectionTitleSx}>
-              Model Seçimi ve Üretim Adedi
+              Hesaplama
             </Typography>
 
             <Box sx={{ mb: 1.25 }}>
@@ -300,13 +297,12 @@ export default function MainCalculator() {
                 setSelectedModel(newValue);
                 setSelectedModelId(newValue?.id || null);
                 setShowResults(false);
-                setStoneListOpen(false);
               }}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   margin="dense"
-                  label="Model veya Stok Kodu ile Ara"
+                  label="Model seçimi"
                   variant="outlined"
                   size="small"
                   sx={{ mb: 1 }}
@@ -327,7 +323,7 @@ export default function MainCalculator() {
             />
 
             <TextField
-              label="Üretim Adedi"
+              label="Üretim adedi"
               type="number"
               fullWidth
               margin="dense"
@@ -338,7 +334,6 @@ export default function MainCalculator() {
                 if (value === '' || (/^[1-9][0-9]*$/.test(value) && parseInt(value) > 0)) {
                   setLocalProductionCount(value);
                   setShowResults(false);
-                  setStoneListOpen(false);
                 }
               }}
               onKeyDown={handleKeyDown}
@@ -350,537 +345,337 @@ export default function MainCalculator() {
                   MozAppearance: 'textfield',
                 },
               }}
-              helperText="Hesaplamak için Enter tuşuna basın"
+              helperText={calculateHint}
               sx={{ mb: 0, '& .MuiFormHelperText-root': { mt: 0.5, mb: 0 } }}
             />
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
+            <Box sx={{ mt: 1.5 }}>
               <Button
                 variant="contained"
-                color="secondary"
-                sx={{
-                  px: 2.5,
-                  py: 0.6,
-                  color: 'white',
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  fontSize: '0.8125rem',
-                }}
+                fullWidth
+                sx={charcoalBtnSx}
                 onClick={handleCalculate}
-                disabled={!selectedModelId || !localProductionCount}
+                disabled={!canCalculate}
               >
                 Hesapla
               </Button>
             </Box>
+
+            {showResults && calculationResult && (
+              <Box sx={{ mt: 'auto', pt: 1.75, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                <Typography
+                  sx={{ color: '#6B7280', fontSize: '0.75rem', fontWeight: 500, mb: -0.5 }}
+                >
+                  Hesaplama sonucu
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    py: 3.5,
+                    px: 1.5,
+                    borderRadius: '10px',
+                    border: '1px solid #e5e7eb',
+                    bgcolor: '#ffffff',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      color: '#0F172A',
+                      fontSize: { xs: '1.75rem', md: '2rem' },
+                      fontWeight: 700,
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {calculationResult.totalWeight.toFixed(2).replace('.', ',')} gr
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddToHistory}
+                  fullWidth
+                  sx={charcoalBtnSx}
+                >
+                  Geçmişe ekle
+                </Button>
+              </Box>
+            )}
           </CardContent>
         </Card>
 
-        <Card sx={cardSx}>
+        {/* Model görseli — masaüstünde sol */}
+        <Card sx={{ ...cardSx, order: { xs: 1, md: 1 } }}>
           <CardContent sx={cardContentSx}>
             <Typography variant="subtitle1" sx={sectionTitleSx}>
-              Model Görseli
+              Model görseli
             </Typography>
 
-            {selectedModelImage ? (
-              <Box
-                sx={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: { xs: 260, md: 300 },
-                  bgcolor: '#f7f8fa',
-                  borderRadius: '10px',
-                  border: '1px solid #e5e7eb',
-                  p: 1.25,
-                }}
-              >
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: { xs: 220, md: 280 },
+                bgcolor: '#f8fafc',
+                borderRadius: '10px',
+                border: '1px solid #e5e7eb',
+                p: 1.25,
+                mb: 1.5,
+              }}
+            >
+              {selectedModelImage ? (
                 <CardMedia
                   component="img"
                   sx={{
-                    maxHeight: 280,
+                    maxHeight: 300,
                     maxWidth: '100%',
                     objectFit: 'contain',
                     borderRadius: '8px',
                   }}
                   image={selectedModelImage}
-                  alt="Model Görseli"
+                  alt="Ürün fotoğrafı"
                 />
-              </Box>
+              ) : (
+                <Typography color="#94A3B8" variant="body2" sx={{ fontSize: '0.875rem' }}>
+                  Ürün fotoğrafı
+                </Typography>
+              )}
+            </Box>
+
+            <Paper
+              elevation={0}
+              sx={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '10px',
+                p: 1.5,
+                bgcolor: '#ffffff',
+                minHeight: 110,
+              }}
+            >
+              <Typography
+                sx={{ fontWeight: 600, fontSize: '0.8125rem', color: '#1F2937', mb: 0.75, textAlign: 'center' }}
+              >
+                Taş listesi
+              </Typography>
+              {showResults && calculationResult && calculationResult.stoneDetails.length > 0 ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  {calculationResult.stoneDetails.map((detail) => (
+                    <Box key={detail.stoneId}>
+                      <Typography
+                        sx={{ fontSize: '0.8125rem', fontWeight: 500, color: '#1F2937', lineHeight: 1.3 }}
+                      >
+                        {detail.stoneName}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: '#64748B' }}>
+                        {detail.quantity} adet - {detail.totalWeight.toFixed(2).replace('.', ',')} gr
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Typography sx={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'center' }}>
+                  Hesaplama sonrası taşlar burada görünür
+                </Typography>
+              )}
+            </Paper>
+          </CardContent>
+        </Card>
+
+        {/* Hesaplama geçmişi — sağ */}
+        <Card sx={{ ...cardSx, order: { xs: 3, md: 3 } }}>
+          <CardContent sx={cardContentSx}>
+            <Box
+              sx={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 1.5,
+                minHeight: 32,
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ ...sectionTitleSx, mb: 0 }}>
+                Hesaplama geçmişi
+              </Typography>
+              {calculationHistory.length > 0 && (
+                <Button
+                  size="small"
+                  onClick={handleOpenClearHistoryDialog}
+                  startIcon={<DeleteIcon fontSize="small" />}
+                  sx={{
+                    position: 'absolute',
+                    right: 0,
+                    color: '#EF4444',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.75rem',
+                    borderRadius: '8px',
+                    px: 1,
+                    minWidth: 'auto',
+                    '&:hover': { bgcolor: '#FEE2E2' },
+                  }}
+                >
+                  Temizle
+                </Button>
+              )}
+            </Box>
+
+            {calculationHistory.length > 0 ? (
+              <>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    maxHeight: { xs: 300, md: 380 },
+                    overflowY: 'auto',
+                    mb: 1.25,
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '10px',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 48px 56px 32px',
+                      gap: 0.5,
+                      px: 1.25,
+                      py: 0.75,
+                      bgcolor: '#F8FAFC',
+                      borderBottom: '1px solid #e5e7eb',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '0.6875rem', fontWeight: 600, color: '#64748B' }}>
+                      Model
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: '0.6875rem', fontWeight: 600, color: '#64748B', textAlign: 'right' }}
+                    >
+                      Adet
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: '0.6875rem', fontWeight: 600, color: '#64748B', textAlign: 'right' }}
+                    >
+                      Gram
+                    </Typography>
+                    <Box />
+                  </Box>
+
+                  {calculationHistory.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 48px 56px 32px',
+                        gap: 0.5,
+                        alignItems: 'center',
+                        px: 1.25,
+                        py: 0.85,
+                        borderBottom: '1px solid #f1f5f9',
+                        '&:last-child': { borderBottom: 'none' },
+                        '&:hover': { bgcolor: '#f8fafc' },
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          color: '#1F2937',
+                          lineHeight: 1.3,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={item.modelName}
+                      >
+                        {item.modelName}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: '0.75rem', color: '#334155', textAlign: 'right', fontWeight: 500 }}
+                      >
+                        {item.productionCount}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: '0.75rem', color: '#334155', textAlign: 'right', fontWeight: 500 }}
+                      >
+                        {item.totalWeight.toFixed(2).replace('.', ',')}
+                      </Typography>
+                      <IconButton
+                        aria-label="delete"
+                        onClick={() => handleRemoveFromHistory(item.id)}
+                        size="small"
+                        sx={{
+                          color: '#EF4444',
+                          p: 0.25,
+                          justifySelf: 'end',
+                          '&:hover': { bgcolor: '#FEE2E2' },
+                        }}
+                      >
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+
+                <Box
+                  sx={{
+                    p: 1.25,
+                    borderRadius: '8px',
+                    bgcolor: '#2563EB',
+                    textAlign: 'center',
+                    mb: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      color: 'white',
+                      fontWeight: 700,
+                      fontSize: '0.9375rem',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Toplam: {historyTotal.toFixed(2).replace('.', ',')} gr
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="contained"
+                  startIcon={<PrintIcon />}
+                  onClick={handleOpenPrintMetalDialog}
+                  fullWidth
+                  sx={{ ...charcoalBtnSx, flexShrink: 0 }}
+                >
+                  Yazdır
+                </Button>
+              </>
             ) : (
               <Box
                 sx={{
                   flex: 1,
-                  minHeight: { xs: 260, md: 300 },
+                  minHeight: 180,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: '#f7f8fa',
+                  color: '#94A3B8',
+                  bgcolor: '#f8fafc',
                   borderRadius: '10px',
-                  border: '1px dashed #e5e7eb',
+                  border: '1px dashed #e2e8f0',
                 }}
               >
-                <Typography color="#6B7280" variant="body2" sx={{ fontSize: '0.8125rem' }}>
-                  {selectedModelId ? 'Model görseli mevcut değil' : 'Model seçildiğinde görsel burada görünür'}
+                <Typography variant="body2" sx={{ fontSize: '0.8125rem' }}>
+                  Henüz hesaplama eklenmemiş
                 </Typography>
               </Box>
             )}
           </CardContent>
         </Card>
-      </Box>
-
-      {/* Alt satır: Hesaplama Sonucu | Hesaplama Geçmişi */}
-      <Box sx={rowGridSx}>
-        <Card sx={{ ...cardSx, height: 300, minHeight: 300 }}>
-          <CardContent sx={cardContentSx}>
-            <Typography variant="subtitle1" sx={sectionTitleSx}>
-              Hesaplama Sonucu
-            </Typography>
-
-            {showResults && calculationResult ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    py: 2,
-                    px: 1.5,
-                    borderRadius: '10px',
-                    bgcolor: '#EFF6FF',
-                    border: '1.5px solid #2563EB',
-                    width: '100%',
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{ color: '#2563EB', fontWeight: 600, fontSize: '0.75rem', mb: 0.75 }}
-                  >
-                    Toplam Taş Gramı
-                  </Typography>
-                  <Typography
-                    variant="h2"
-                    fontWeight={700}
-                    sx={{
-                      color: '#2563EB',
-                      fontSize: { xs: '1.75rem', md: '2.125rem' },
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    {calculationResult.totalWeight.toFixed(2)} gr
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    gap: 1,
-                  }}
-                >
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      flex: 1,
-                      p: 1.25,
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      bgcolor: '#ffffff',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ color: '#6B7280', fontWeight: 500, fontSize: '0.6875rem', mb: 0.5 }}
-                    >
-                      Model Adı
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: '#1F2937', fontWeight: 500, fontSize: '0.8125rem', lineHeight: 1.3 }}
-                    >
-                      {calculationResult.modelName}
-                    </Typography>
-                  </Paper>
-
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      flex: 1,
-                      p: 1.25,
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      bgcolor: '#ffffff',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ color: '#6B7280', fontWeight: 500, fontSize: '0.6875rem', mb: 0.5 }}
-                    >
-                      Üretim Adedi
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: '#1F2937', fontWeight: 600, fontSize: '1rem' }}
-                    >
-                      {calculationResult.productionCount}
-                    </Typography>
-                  </Paper>
-                </Box>
-
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleAddToHistory}
-                    sx={{
-                      bgcolor: '#2563EB',
-                      color: 'white',
-                      borderRadius: '8px',
-                      px: 2,
-                      py: 0.6,
-                      fontWeight: 500,
-                      fontSize: '0.8125rem',
-                      textTransform: 'none',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                      '&:hover': {
-                        bgcolor: '#1D4ED8',
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                      },
-                    }}
-                  >
-                    Ekle
-                  </Button>
-                </Box>
-              </Box>
-            ) : (
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: '#f7f8fa',
-                  borderRadius: '10px',
-                  border: '1px dashed #e5e7eb',
-                  minHeight: 220,
-                }}
-              >
-                <Typography color="#6B7280" variant="body2" sx={{ fontSize: '0.8125rem', textAlign: 'center', px: 2 }}>
-                  Hesapla ile sonuç burada görünür
-                </Typography>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card sx={{ ...cardSx, height: 300, minHeight: 300, overflow: 'hidden' }}>
-          <CardContent sx={{ ...cardContentSx, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                mb: 1.25,
-                gap: 1,
-                minHeight: 32,
-                flexShrink: 0,
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ ...sectionTitleSx, mb: 0 }}>
-                Hesaplama Geçmişi
-              </Typography>
-              <Button
-                size="small"
-                onClick={handleOpenClearHistoryDialog}
-                startIcon={<DeleteIcon fontSize="small" />}
-                disabled={calculationHistory.length === 0}
-                sx={{
-                  color: '#EF4444',
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.8125rem',
-                  borderRadius: '8px',
-                  px: 1,
-                  minWidth: 'auto',
-                  visibility: calculationHistory.length > 0 ? 'visible' : 'hidden',
-                  '&:hover': { bgcolor: '#FEE2E2' },
-                }}
-              >
-                Temizle
-              </Button>
-            </Box>
-
-            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              {calculationHistory.length > 0 ? (
-                <>
-                  <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', mb: 1.25, pr: 0.5 }}>
-                    <List sx={{ py: 0 }}>
-                      {calculationHistory.map((item) => (
-                        <ListItem
-                          key={item.id}
-                          sx={{
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            mb: 0.75,
-                            px: 1.25,
-                            py: 0.75,
-                            bgcolor: '#ffffff',
-                            minHeight: '48px',
-                            '&:hover': {
-                              bgcolor: '#f7f8fa',
-                              borderColor: '#d1d5db',
-                            },
-                          }}
-                          secondaryAction={
-                            <IconButton
-                              edge="end"
-                              aria-label="delete"
-                              onClick={() => handleRemoveFromHistory(item.id)}
-                              size="small"
-                              sx={{
-                                color: '#EF4444',
-                                p: 0.5,
-                                '&:hover': { bgcolor: '#FEE2E2' },
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body2"
-                                fontWeight={500}
-                                sx={{
-                                  fontSize: '0.8125rem',
-                                  color: '#1F2937',
-                                  lineHeight: 1.5,
-                                  mb: 0.25,
-                                }}
-                              >
-                                {item.modelName}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  color: '#6B7280',
-                                  display: 'block',
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {item.productionCount} adet • {item.totalWeight.toFixed(2)} gr
-                              </Typography>
-                            }
-                            sx={{
-                              my: 0,
-                              '& .MuiListItemText-primary': { mb: 0 },
-                              '& .MuiListItemText-secondary': { mt: 0 },
-                            }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      p: 1.25,
-                      borderRadius: '8px',
-                      bgcolor: '#2563EB',
-                      textAlign: 'center',
-                      mb: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: 'white',
-                        fontWeight: 500,
-                        fontSize: '0.6875rem',
-                        display: 'block',
-                        mb: 0.25,
-                      }}
-                    >
-                      Toplam Taş Gramı
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      fontWeight={700}
-                      sx={{ color: 'white', fontSize: '1rem', lineHeight: 1.2 }}
-                    >
-                      {calculationHistory.reduce((sum, item) => sum + item.totalWeight, 0).toFixed(2)} gr
-                    </Typography>
-                  </Box>
-
-                  <Button
-                    variant="contained"
-                    startIcon={<PrintIcon />}
-                    onClick={handleOpenPrintMetalDialog}
-                    fullWidth
-                    sx={{
-                      bgcolor: '#2563EB',
-                      color: 'white',
-                      borderRadius: '8px',
-                      py: 0.75,
-                      fontSize: '0.8125rem',
-                      fontWeight: 500,
-                      textTransform: 'none',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                      '&:hover': {
-                        bgcolor: '#1D4ED8',
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                      },
-                    }}
-                  >
-                    Yazdır
-                  </Button>
-                </>
-              ) : (
-                <Box
-                  sx={{
-                    flex: 1,
-                    minHeight: 120,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#6B7280',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontSize: '0.8125rem' }}>
-                    Henüz hesaplama eklenmemiş
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Taş Listesi - accordion (sabit alan: sayfa kaymasın) */}
-      <Box sx={{ minHeight: 52 }}>
-        {showResults && calculationResult && calculationResult.stoneDetails.length > 0 && (
-          <Card sx={{ ...cardSx, height: 'auto' }}>
-            <Box
-              onClick={() => setStoneListOpen((open) => !open)}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 1.75,
-                py: 1.25,
-                cursor: 'pointer',
-                userSelect: 'none',
-                '&:hover': { bgcolor: '#f9fafb' },
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography
-                  variant="subtitle1"
-                  sx={{ fontWeight: 600, color: '#1F2937', fontSize: '0.875rem', m: 0 }}
-                >
-                  Taş Listesi
-                </Typography>
-                <Chip
-                  size="small"
-                  label={calculationResult.stoneDetails.length}
-                  sx={{ height: 22, fontSize: '0.75rem', fontWeight: 600 }}
-                />
-              </Box>
-              <ExpandMoreIcon
-                sx={{
-                  color: '#6B7280',
-                  transform: stoneListOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                }}
-              />
-            </Box>
-
-            <Collapse in={stoneListOpen} timeout="auto" unmountOnExit>
-              <CardContent sx={{ ...cardContentSx, pt: 0 }}>
-                <TableContainer
-                  component={Paper}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: '10px',
-                    border: '1px solid #E5E7EB',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ bgcolor: '#F9FAFB' }}>
-                        <TableCell
-                          sx={{
-                            fontWeight: 500,
-                            color: '#1F2937',
-                            fontSize: '0.875rem',
-                            borderBottom: '1px solid #E5E7EB',
-                          }}
-                          width="70%"
-                        >
-                          Taş Adı
-                        </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{
-                            fontWeight: 500,
-                            color: '#1F2937',
-                            fontSize: '0.875rem',
-                            borderBottom: '1px solid #E5E7EB',
-                          }}
-                          width="30%"
-                        >
-                          Adet
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {calculationResult.stoneDetails.map((detail) => (
-                        <TableRow
-                          key={detail.stoneId}
-                          sx={{
-                            '&:hover': { bgcolor: '#F9FAFB' },
-                            '&:last-child td': { borderBottom: 'none' },
-                          }}
-                        >
-                          <TableCell
-                            sx={{
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: 0,
-                              color: '#1F2937',
-                              fontSize: '0.875rem',
-                              borderBottom: '1px solid #E5E7EB',
-                            }}
-                          >
-                            {detail.stoneName}
-                          </TableCell>
-                          <TableCell
-                            align="right"
-                            sx={{
-                              color: '#1F2937',
-                              fontSize: '0.875rem',
-                              fontWeight: 500,
-                              borderBottom: '1px solid #E5E7EB',
-                            }}
-                          >
-                            {detail.quantity}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Collapse>
-          </Card>
-        )}
       </Box>
 
       <Dialog
@@ -891,9 +686,7 @@ export default function MainCalculator() {
         disableScrollLock
         TransitionProps={{ onExited: handleClearHistoryDialogExited }}
       >
-        <DialogTitle sx={{ fontWeight: 600, color: '#1F2937' }}>
-          Geçmişi Temizle
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, color: '#1F2937' }}>Geçmişi Temizle</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: '#4B5563', fontSize: '0.9375rem' }}>
             Tüm hesaplama geçmişini temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.
@@ -927,9 +720,7 @@ export default function MainCalculator() {
         fullWidth
         disableScrollLock
       >
-        <DialogTitle sx={{ fontWeight: 600, color: '#1F2937' }}>
-          Metal Türü Seçin
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, color: '#1F2937' }}>Metal Türü Seçin</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: '#4B5563', fontSize: '0.9375rem', mb: 2 }}>
             Fişe eklenecek metal bilgisini seçin.
@@ -938,13 +729,22 @@ export default function MainCalculator() {
             <Button
               variant="contained"
               fullWidth
+              disableElevation
               onClick={() => handlePrintHistory('altın')}
               sx={{
                 textTransform: 'none',
                 py: 1.25,
                 fontWeight: 600,
-                bgcolor: '#B45309',
-                '&:hover': { bgcolor: '#92400E' },
+                color: '#78350F',
+                bgcolor: '#F5C542',
+                backgroundImage: 'linear-gradient(180deg, #F8D56B 0%, #E6B422 100%)',
+                border: '1px solid #D4A017',
+                boxShadow: 'none',
+                '&:hover': {
+                  bgcolor: '#E6B422',
+                  backgroundImage: 'linear-gradient(180deg, #F0C94A 0%, #D4A017 100%)',
+                  boxShadow: 'none',
+                },
               }}
             >
               Altın — 14 Ayar Yeşil
@@ -952,13 +752,22 @@ export default function MainCalculator() {
             <Button
               variant="contained"
               fullWidth
+              disableElevation
               onClick={() => handlePrintHistory('gümüş')}
               sx={{
                 textTransform: 'none',
                 py: 1.25,
                 fontWeight: 600,
-                bgcolor: '#64748B',
-                '&:hover': { bgcolor: '#475569' },
+                color: '#1F2937',
+                bgcolor: '#C0C5CE',
+                backgroundImage: 'linear-gradient(180deg, #D8DCE3 0%, #A8AEB8 100%)',
+                border: '1px solid #9CA3AF',
+                boxShadow: 'none',
+                '&:hover': {
+                  bgcolor: '#A8AEB8',
+                  backgroundImage: 'linear-gradient(180deg, #C5CAD2 0%, #949AA5 100%)',
+                  boxShadow: 'none',
+                },
               }}
             >
               Gümüş — 925 ayar Gümüş

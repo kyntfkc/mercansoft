@@ -232,6 +232,70 @@ export function buildReceiptHtml(
 </html>`;
 }
 
+export const RECEIPT_PRINTER_NAME = 'FisYaz Ethernet';
+export const LOCAL_PRINT_AGENT_URL =
+  process.env.NEXT_PUBLIC_PRINT_AGENT_URL || 'http://127.0.0.1:39100';
+
+async function printViaLocalAgent(
+  html: string,
+  settings?: { width?: number; height?: number; minHeight?: number }
+): Promise<{ ok: boolean; message?: string; unreachable?: boolean }> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(`${LOCAL_PRINT_AGENT_URL}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        html,
+        printer: RECEIPT_PRINTER_NAME,
+        width: settings?.width ?? 80,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success) {
+      return {
+        ok: false,
+        message: data?.message || `Yazdırma servisi hata verdi (${response.status})`,
+      };
+    }
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return {
+      ok: false,
+      unreachable: true,
+      message:
+        error instanceof Error && error.name === 'AbortError'
+          ? 'Yazdırma servisi zaman aşımına uğradı'
+          : 'Yerel yazdırma servisi çalışmıyor',
+    };
+  }
+}
+
+/** Yerel yazdırma servisi (print-agent); yoksa tarayıcı diyaloğu. */
+export async function printReceipt(
+  html: string,
+  settings?: { width?: number; height?: number; minHeight?: number }
+): Promise<{ silent: boolean; message?: string }> {
+  const local = await printViaLocalAgent(html, settings);
+  if (local.ok) {
+    return { silent: true, message: local.message };
+  }
+  if (!local.unreachable) {
+    throw new Error(local.message || 'Yazıcıya gönderilemedi');
+  }
+
+  openPrintWindow(html);
+  return {
+    silent: false,
+    message:
+      'Yerel yazdırma servisi kapalı. Otomatik gönderim için print-agent\\baslat.bat çalıştırın.',
+  };
+}
+
 export function openPrintWindow(html: string): void {
   // Firefox yazdırma paneli için geniş pencere; boyut vermezsek küçük popup açılır
   const printWindow = window.open(
