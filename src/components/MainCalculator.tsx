@@ -725,48 +725,64 @@ export default function MainCalculator() {
           <Typography sx={{ color: '#4B5563', fontSize: '0.9375rem', mb: 2 }}>
             Fişe eklenecek metal bilgisini seçin.
           </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Button
-              variant="contained"
               fullWidth
               disableElevation
+              disableRipple
               onClick={() => handlePrintHistory('altın')}
               sx={{
                 textTransform: 'none',
-                py: 1.25,
-                fontWeight: 600,
-                color: '#78350F',
-                bgcolor: '#F5C542',
-                backgroundImage: 'linear-gradient(180deg, #F8D56B 0%, #E6B422 100%)',
-                border: '1px solid #D4A017',
-                boxShadow: 'none',
+                py: 1.75,
+                px: 2,
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '1rem',
+                letterSpacing: '0.01em',
+                color: '#5C3D0A !important',
+                backgroundColor: '#F5C518 !important',
+                backgroundImage: 'none !important',
+                border: '2px solid #D4A017',
+                boxShadow: '0 1px 2px rgba(92, 61, 10, 0.12)',
                 '&:hover': {
-                  bgcolor: '#E6B422',
-                  backgroundImage: 'linear-gradient(180deg, #F0C94A 0%, #D4A017 100%)',
-                  boxShadow: 'none',
+                  backgroundColor: '#E8B40A !important',
+                  backgroundImage: 'none !important',
+                  borderColor: '#B8860B',
+                  boxShadow: '0 2px 8px rgba(212, 160, 23, 0.35)',
+                },
+                '&:active': {
+                  backgroundColor: '#D4A017 !important',
                 },
               }}
             >
               Altın — 14 Ayar Yeşil
             </Button>
             <Button
-              variant="contained"
               fullWidth
               disableElevation
+              disableRipple
               onClick={() => handlePrintHistory('gümüş')}
               sx={{
                 textTransform: 'none',
-                py: 1.25,
-                fontWeight: 600,
-                color: '#1F2937',
-                bgcolor: '#C0C5CE',
-                backgroundImage: 'linear-gradient(180deg, #D8DCE3 0%, #A8AEB8 100%)',
-                border: '1px solid #9CA3AF',
-                boxShadow: 'none',
+                py: 1.75,
+                px: 2,
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '1rem',
+                letterSpacing: '0.01em',
+                color: '#1F2937 !important',
+                backgroundColor: '#E8EAED !important',
+                backgroundImage: 'none !important',
+                border: '2px solid #9CA3AF',
+                boxShadow: '0 1px 2px rgba(31, 41, 55, 0.08)',
                 '&:hover': {
-                  bgcolor: '#A8AEB8',
-                  backgroundImage: 'linear-gradient(180deg, #C5CAD2 0%, #949AA5 100%)',
-                  boxShadow: 'none',
+                  backgroundColor: '#D1D5DB !important',
+                  backgroundImage: 'none !important',
+                  borderColor: '#6B7280',
+                  boxShadow: '0 2px 8px rgba(107, 114, 128, 0.25)',
+                },
+                '&:active': {
+                  backgroundColor: '#C4C9D1 !important',
                 },
               }}
             >
