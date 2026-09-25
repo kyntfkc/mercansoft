@@ -1,19 +1,19 @@
 # Local Verileri Railway Backend'e Aktarma
 
-Bu rehber, Electron uygulamasındaki local verileri Railway backend'e aktarmanız için adımları içerir.
+Bu rehber, uygulamadaki local verileri Railway backend'e aktarmanız için adımları içerir.
 
 ## Adım 1: Verileri Export Et
 
 ### Yöntem 1: Uygulama İçinden (Önerilen)
 
-1. Electron uygulamasını açın
+1. Web uygulamasını açın
 2. **Sistem Ayarları** sekmesine gidin
 3. **Veri Yönetimi** bölümünde **"Verileri Dışa Aktar"** butonuna tıklayın
 4. JSON dosyasını kaydedin (örn: `mercansoft-veriler.json`)
 
 ### Yöntem 2: Developer Tools ile
 
-1. Electron uygulamasını açın
+1. Web uygulamasını açın
 2. `Ctrl+Shift+I` ile Developer Tools'u açın
 3. Console sekmesine gidin
 4. Şu komutu çalıştırın:

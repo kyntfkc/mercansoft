@@ -21,10 +21,14 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MercanSoft - Taş Hesaplama Uygulaması",
+  title: "indigo | Taş Hesap",
   description: "Takı modelleri için profesyonel taş ağırlığı hesaplama sistemi",
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+      { url: '/logo-indigo.png', type: 'image/png' },
+    ],
+    apple: '/icon.png',
   },
 };
 

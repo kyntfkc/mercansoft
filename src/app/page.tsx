@@ -38,7 +38,6 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InfoIcon from '@mui/icons-material/Info';
 import BusinessIcon from '@mui/icons-material/Business';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import nextDynamic from 'next/dynamic';
 import { useStore } from '../store/useStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRouter } from 'next/navigation';
@@ -47,14 +46,11 @@ import PersonIcon from '@mui/icons-material/Person';
 import { companySettingsAPI } from '../lib/api';
 import { DEFAULT_LOGO, BRAND_LOGO_SX, getCachedCompanyLogo, cacheCompanyLogo } from '../lib/logo';
 
-// Electron test bileşenlerini client-side render'lamak için dynamic import kullanıyoruz
-const ElectronVersionDisplay = nextDynamic(() => import('@/components/ElectronVersionDisplay'), { ssr: false });
-
 // Özel Tab İçerik Komponenti
 function TabContent({ active, children }: { active: boolean, children: React.ReactNode }) {
   return (
     <Fade in={active} timeout={450}>
-      <Box sx={{ p: { xs: 1, sm: 1.25 }, display: active ? 'block' : 'none' }}>
+      <Box sx={{ p: { xs: 1.25, sm: 1.5, md: 2 }, display: active ? 'block' : 'none' }}>
         {children}
       </Box>
     </Fade>
@@ -215,19 +211,43 @@ function HomeContent() {
 
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', bgcolor: '#f7f8fa' }}>
-      <Container maxWidth="xl" sx={{ py: 1.5, px: { xs: 1.5, md: 2 } }}>
+      <Container maxWidth={false} sx={{ py: 1.5, px: { xs: 1.5, sm: 2, md: 3, lg: 4 }, maxWidth: 1600, mx: 'auto' }}>
         <Zoom in={showContent} timeout={600}>
           <Box
             sx={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr auto 1fr' },
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
+              gap: { xs: 1, sm: 2 },
               mb: 1.5,
-              flexWrap: 'wrap',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Box
+              sx={{
+                display: { xs: 'none', sm: 'flex' },
+                alignItems: 'center',
+                minWidth: 0,
+              }}
+            >
+              <Typography
+                sx={{
+                  color: '#64748B',
+                  fontSize: '0.8125rem',
+                  lineHeight: 1.3,
+                }}
+              >
+                Gelişmiş Taş Hesaplama Sistemi
+              </Typography>
+            </Box>
+
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                justifySelf: 'center',
+              }}
+            >
               {companyLogo && (
                 <Box
                   component="img"
@@ -245,7 +265,10 @@ function HomeContent() {
                       fallback.style.display = 'flex';
                     }
                   }}
-                  sx={BRAND_LOGO_SX}
+                  sx={{
+                    ...BRAND_LOGO_SX,
+                    height: { xs: '2.5rem', md: '3rem' },
+                  }}
                 />
               )}
               <Box
@@ -261,21 +284,17 @@ function HomeContent() {
                   MercanSoft
                 </Typography>
               </Box>
-              <Typography
-                sx={{
-                  display: { xs: 'none', sm: 'block' },
-                  color: '#64748B',
-                  fontSize: '0.8125rem',
-                  lineHeight: 1.3,
-                  borderLeft: '1px solid #e2e8f0',
-                  pl: 1.5,
-                }}
-              >
-                Gelişmiş Taş Hesaplama Sistemi
-              </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, ml: 'auto' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: { xs: 'center', sm: 'flex-end' },
+                gap: 1.25,
+                minWidth: 0,
+              }}
+            >
               <Typography variant="body2" fontWeight={600} color="text.primary" noWrap>
                 {user ? `Hoş geldin, ${user.username}` : 'Hoş geldiniz'}
               </Typography>
@@ -546,21 +565,18 @@ function HomeContent() {
                         startIcon={<DownloadIcon />}
                         fullWidth
                         onClick={() => {
-                          if (window.electronAPI) {
-                            const appData = JSON.parse(exportData()); // Store'dan verileri al
-                            window.electronAPI.saveFile(appData, 'mercansoft-veriler.json')
-                              .then(result => {
-                                if (result.success) {
-                                  showMessage('Veriler başarıyla dışa aktarıldı', 'success');
-                                } else {
-                                  showMessage(result.message, 'error');
-                                }
-                              })
-                              .catch(error => {
-                                showMessage('Dışa aktarma sırasında bir hata oluştu: ' + error, 'error');
-                              });
-                          } else {
-                            showMessage('Bu özellik sadece masaüstü uygulamasında kullanılabilir', 'warning');
+                          try {
+                            const data = exportData();
+                            const blob = new Blob([data], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'mercansoft-veriler.json';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            showMessage('Veriler başarıyla dışa aktarıldı', 'success');
+                          } catch (error) {
+                            showMessage('Dışa aktarma sırasında bir hata oluştu: ' + error, 'error');
                           }
                         }}
                         sx={{ mt: 'auto' }}
@@ -594,26 +610,21 @@ function HomeContent() {
                         startIcon={<UploadFileIcon />}
                         fullWidth
                         onClick={() => {
-                          if (window.electronAPI) {
-                            window.electronAPI.openFile()
-                              .then(result => {
-                                if (result.success && result.data) {
-                                  try {
-                                    importData(JSON.stringify(result.data));
-                                    showMessage('Veriler başarıyla içe aktarıldı', 'success');
-                                  } catch (error) {
-                                    showMessage('Veri formatı uygun değil: ' + error, 'error');
-                                  }
-                                } else {
-                                  showMessage(result.message, 'error');
-                                }
-                              })
-                              .catch(error => {
-                                showMessage('İçe aktarma sırasında bir hata oluştu: ' + error, 'error');
-                              });
-                          } else {
-                            showMessage('Bu özellik sadece masaüstü uygulamasında kullanılabilir', 'warning');
-                          }
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'application/json,.json';
+                          input.onchange = async () => {
+                            const file = input.files?.[0];
+                            if (!file) return;
+                            try {
+                              const text = await file.text();
+                              importData(text);
+                              showMessage('Veriler başarıyla içe aktarıldı', 'success');
+                            } catch (error) {
+                              showMessage('Veri formatı uygun değil: ' + error, 'error');
+                            }
+                          };
+                          input.click();
                         }}
                         sx={{ mt: 'auto' }}
                       >
@@ -677,9 +688,9 @@ function HomeContent() {
                     <Typography variant="body2" color="text.secondary" paragraph>
                       MercanSoft Taş Hesaplama Uygulaması, takı modellerindeki taşların ağırlıklarını hesaplamak için tasarlanmış özel bir uygulamadır.
                     </Typography>
-                    
-                    <ElectronVersionDisplay />
-                    
+                    <Typography variant="body2" color="text.secondary">
+                      Versiyon: 2.0.0
+                    </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
                       © {new Date().getFullYear()} MercanSoft - Tüm hakları saklıdır.
                     </Typography>

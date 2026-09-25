@@ -2,14 +2,11 @@
   "name": "mercansoft",
   "version": "2.0.0",
   "private": true,
-  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "electron:dev": "concurrently \"npm run dev\" \"electron .\"",
-    "electron:build": "next build && electron-builder"
+    "lint": "next lint"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -38,31 +35,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^8.2.2",
-    "electron": "^29.0.1",
-    "electron-builder": "^24.13.0",
-    "electron-is-dev": "^2.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.0.13",
     "typescript": "^5"
-  },
-  "build": {
-    "appId": "com.mercansoft.app",
-    "productName": "MercanSoft",
-    "files": [
-      "electron/**/*",
-      "out/**/*"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }

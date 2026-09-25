@@ -10,7 +10,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// LocalStorage verilerini oku (Electron uygulamasından)
+// LocalStorage verilerini oku (eski masaüstü kurulumundan kalan yollar)
 // Windows: C:\Users\<username>\AppData\Roaming\<app-name>\Local Storage\leveldb\
 // veya C:\Users\<username>\AppData\Local\<app-name>\Local Storage\leveldb\
 
@@ -176,7 +176,7 @@ Kullanım:
 Örnek:
   node migrate-local-data.js C:\\Users\\kayha\\Desktop\\mercansoft-veriler.json
 
-Not: Önce Electron uygulamasından verileri export edin:
+Not: Önce uygulamadan verileri export edin:
   1. Uygulamayı açın
   2. Sistem Ayarları > Veri Yönetimi > Verileri Dışa Aktar
   3. JSON dosyasını kaydedin
